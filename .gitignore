@@ -1,0 +1,9 @@
+target/
+!.mvn/wrapper/maven-wrapper.properties
+*.class
+*.log
+.idea/
+*.iml
+.vscode/
+.mvn/wrapper/maven-wrapper.jar
+dependency-reduced-pom.xml

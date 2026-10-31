@@ -1,0 +1,1045 @@
+openapi: 3.0.3
+info:
+  title: ANEON TTTM - F01 Quản lý mặt bằng & F10 Sự kiện/Khuyến mãi
+  version: 0.1.0
+  description: >
+    Hợp đồng API baseline lấy từ TK-F01 mục 5 và TK-F10 mục 5 (bảng tổng hợp).
+    Endpoint đánh dấu [Supplemental] là bổ sung được chốt trong docs/decisions/0004.
+    Thời điểm ISO-8601 UTC; UUID chuẩn; tiền/diện tích là số thập phân;
+    tỷ lệ giảm giá theo thang 0..100.
+servers:
+  - url: /
+tags:
+  - name: F01 Premises
+  - name: F01 Stores
+  - name: F01 Status
+  - name: F01 History
+  - name: F01 Utilization
+  - name: F10 Events
+  - name: F10 Promotions
+  - name: F10 Vouchers
+  - name: F10 Public
+paths:
+  /api/v1/f01/premises:
+    get:
+      tags: [F01 Premises]
+      summary: Tra cứu danh sách mặt bằng (F01UC01.1)
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/q'
+        - $ref: '#/components/parameters/zoneId'
+        - $ref: '#/components/parameters/statusQuery'
+        - $ref: '#/components/parameters/page'
+        - $ref: '#/components/parameters/size'
+      responses:
+        '200': { $ref: '#/components/responses/PremisePage' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+    post:
+      tags: [F01 Premises]
+      summary: Thêm mặt bằng (F01UC01.2)
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreatePremiseRequest' }
+      responses:
+        '201': { $ref: '#/components/responses/PremiseCreated' }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+        '503': { $ref: '#/components/responses/Error' }
+  /api/v1/f01/premises/code-availability:
+    get:
+      tags: [F01 Premises]
+      summary: Kiểm tra trùng mã mặt bằng (F01UC01.4)
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: code, in: query, required: true, schema: { type: string, maxLength: 50 } }
+        - { name: excludeId, in: query, required: false, schema: { $ref: '#/components/schemas/UUID' } }
+      responses:
+        '200':
+          description: available=false không phải lỗi HTTP
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          code: { type: string }
+                          available: { type: boolean }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+  /api/v1/f01/premises/statuses:
+    get:
+      tags: [F01 Status]
+      summary: Xem trạng thái hiện hành mặt bằng (F01UC03.1)
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/statusQuery'
+        - $ref: '#/components/parameters/page'
+        - $ref: '#/components/parameters/size'
+      responses:
+        '200': { $ref: '#/components/responses/StatusPage' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+  /api/v1/f01/premises/{id}:
+    get:
+      tags: [F01 Premises]
+      summary: Chi tiết mặt bằng (F01UC01.1)
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: '#/components/parameters/id' }]
+      responses:
+        '200': { $ref: '#/components/responses/PremiseDetail' }
+        '404': { $ref: '#/components/responses/Error' }
+    put:
+      tags: [F01 Premises]
+      summary: Cập nhật thông tin mặt bằng (F01UC01.3)
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: '#/components/parameters/id' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UpdatePremiseRequest' }
+      responses:
+        '200': { $ref: '#/components/responses/PremiseUpdated' }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+  /api/v1/f01/premises/{id}/location:
+    put:
+      tags: [F01 Premises]
+      summary: Cập nhật vị trí trên bản đồ (F01UC01.5)
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: '#/components/parameters/id' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UpdatePremiseLocationRequest' }
+      responses:
+        '200': { $ref: '#/components/responses/Error' }
+        '400': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+        '503': { $ref: '#/components/responses/Error' }
+  /api/v1/f01/premises/{id}/status:
+    patch:
+      tags: [F01 Status]
+      summary: Cập nhật trạng thái mặt bằng (F01UC03.2)
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: '#/components/parameters/id' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ChangeStatusRequest' }
+      responses:
+        '200': { $ref: '#/components/responses/Error' }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+        '503': { $ref: '#/components/responses/Error' }
+  /api/v1/f01/premises/{id}/sync-contract-status:
+    post:
+      tags: [F01 Status]
+      summary: Đồng bộ trạng thái theo hợp đồng (F01UC03.3)
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: '#/components/parameters/id' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [contractId]
+              properties:
+                contractId: { $ref: '#/components/schemas/UUID' }
+      responses:
+        '200': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+        '503': { $ref: '#/components/responses/Error' }
+  /api/v1/f01/premises/{id}/history:
+    get:
+      tags: [F01 History]
+      summary: Lịch sử thay đổi mặt bằng (F01UC04.1)
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/id' }
+        - { $ref: '#/components/parameters/page' }
+        - { $ref: '#/components/parameters/size' }
+      responses:
+        '200': { $ref: '#/components/responses/HistoryPage' }
+        '403': { $ref: '#/components/responses/Error' }
+  /api/v1/f01/histories:
+    get:
+      tags: [F01 History]
+      summary: Tra cứu lịch sử theo tiêu chí (F01UC04.2)
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: targetType, in: query, schema: { type: string, enum: [MAT_BANG, CUA_HANG] } }
+        - { name: targetId, in: query, schema: { $ref: '#/components/schemas/UUID' } }
+        - { name: targetCode, in: query, schema: { type: string } }
+        - { name: action, in: query, schema: { type: string } }
+        - { name: changedBy, in: query, schema: { $ref: '#/components/schemas/UUID' } }
+        - { name: from, in: query, schema: { type: string, format: date } }
+        - { name: to, in: query, schema: { type: string, format: date } }
+        - { $ref: '#/components/parameters/page' }
+        - { $ref: '#/components/parameters/size' }
+      responses:
+        '200': { $ref: '#/components/responses/HistoryPage' }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+  /api/v1/f01/stores:
+    get:
+      tags: [F01 Stores]
+      summary: Danh sách cửa hàng/sạp (F01UC02.1)
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: premiseId, in: query, schema: { $ref: '#/components/schemas/UUID' } }
+        - { name: status, in: query, schema: { $ref: '#/components/schemas/StoreStatus' } }
+        - { name: q, in: query, schema: { type: string } }
+        - { $ref: '#/components/parameters/page' }
+        - { $ref: '#/components/parameters/size' }
+      responses:
+        '200': { $ref: '#/components/responses/StorePage' }
+        '403': { $ref: '#/components/responses/Error' }
+    post:
+      tags: [F01 Stores]
+      summary: Thêm cửa hàng/sạp (F01UC02.2)
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateStoreRequest' }
+      responses:
+        '201': { $ref: '#/components/responses/Error' }
+        '400': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+  /api/v1/f01/stores/{id}:
+    get:
+      tags: [F01 Stores]
+      summary: Chi tiết cửa hàng/sạp (F01UC02.1)
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: '#/components/parameters/id' }]
+      responses:
+        '200': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+    put:
+      tags: [F01 Stores]
+      summary: Cập nhật cửa hàng/sạp (F01UC02.3)
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: '#/components/parameters/id' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UpdateStoreRequest' }
+      responses:
+        '200': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+  /api/v1/f01/stores/{id}/status:
+    patch:
+      tags: [F01 Stores]
+      summary: Cập nhật trạng thái cửa hàng/sạp (F01UC02.4)
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: '#/components/parameters/id' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ChangeStoreStatusRequest' }
+      responses:
+        '200': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+  /api/v1/f01/utilization:
+    get:
+      tags: [F01 Utilization]
+      summary: Khai thác mặt bằng + lọc khu vực/tầng/trạng thái (F01UC05.1–05.4)
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: zoneId, in: query, schema: { $ref: '#/components/schemas/UUID' } }
+        - { name: floorId, in: query, schema: { $ref: '#/components/schemas/UUID' } }
+        - { name: status, in: query, schema: { $ref: '#/components/schemas/PremiseStatus' } }
+        - { $ref: '#/components/parameters/page' }
+        - { $ref: '#/components/parameters/size' }
+      responses:
+        '200':
+          description: summary trên toàn bộ tập đã lọc; content phân trang
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          summary:
+                            type: object
+                            properties:
+                              total: { type: integer }
+                              occupied: { type: integer }
+                              vacant: { type: integer }
+                              maintenance: { type: integer }
+                          content:
+                            type: array
+                            items: { $ref: '#/components/schemas/UtilizationItem' }
+                          page: { type: integer }
+                          size: { type: integer }
+                          totalElements: { type: integer }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+  /api/v1/f10/events/proposals:
+    post:
+      tags: [F10 Events]
+      summary: Gửi đề xuất sự kiện (F10UC01.1)
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateEventProposalRequest' }
+      responses:
+        '201':
+          description: Trạng thái PENDING_APPROVAL
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties:
+                      data: { $ref: '#/components/schemas/EventSummary' }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+  /api/v1/f10/events/{id}:
+    get:
+      tags: [F10 Events]
+      summary: Chi tiết sự kiện [Supplemental]
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: '#/components/parameters/id' }]
+      responses:
+        '200': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+  /api/v1/f10/events/{id}/approval:
+    put:
+      tags: [F10 Events]
+      summary: Duyệt/từ chối đề xuất sự kiện (F10UC01.5)
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: '#/components/parameters/id' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ApproveEventRequest' }
+      responses:
+        '200': { $ref: '#/components/responses/Error' }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+  /api/v1/f10/events/{id}/activities:
+    post:
+      tags: [F10 Events]
+      summary: Xếp lịch hoạt động, chống trùng vị trí/khung giờ (F10UC01.2)
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: '#/components/parameters/id' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [activities]
+              properties:
+                activities:
+                  type: array
+                  minItems: 1
+                  items: { $ref: '#/components/schemas/CreateActivityRequest' }
+      responses:
+        '201': { $ref: '#/components/responses/Error' }
+        '400': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+  /api/v1/f10/events/{id}/qr-code:
+    post:
+      tags: [F10 Events]
+      summary: Sinh mã QR check-in cho sự kiện đã duyệt (F10UC01.3)
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: '#/components/parameters/id' }]
+      responses:
+        '200':
+          description: QR mới active; mã cũ bị thu hồi. URL chứa token nhạy cảm
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties:
+                      data: { $ref: '#/components/schemas/QrCodeResponse' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+  /api/v1/f10/events/{id}/check-ins:
+    post:
+      tags: [F10 Events]
+      summary: Check-in qua QR [Supplemental] (F10UC01.3/01.4)
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: '#/components/parameters/id' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CheckInRequest' }
+      responses:
+        '201': { $ref: '#/components/responses/Error' }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+  /api/v1/f10/events/{id}/expenses:
+    post:
+      tags: [F10 Events]
+      summary: Ghi chi phí thực tế [Supplemental] (F10UC01.4)
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: '#/components/parameters/id' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateExpenseRequest' }
+      responses:
+        '201': { $ref: '#/components/responses/Error' }
+        '400': { $ref: '#/components/responses/Error' }
+  /api/v1/f10/events/{id}/report:
+    get:
+      tags: [F10 Events]
+      summary: Báo cáo chi phí/lượt tham gia/ROI (F10UC01.4)
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: '#/components/parameters/id' }]
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties:
+                      data: { $ref: '#/components/schemas/EventReportResponse' }
+        '404': { $ref: '#/components/responses/Error' }
+  /api/v1/f10/promotions:
+    post:
+      tags: [F10 Promotions]
+      summary: Tạo chương trình khuyến mãi — đúng một loại (F10UC02.1)
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreatePromotionRequest' }
+      responses:
+        '201': { $ref: '#/components/responses/Error' }
+        '400': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+  /api/v1/f10/promotions/{id}/realtime:
+    get:
+      tags: [F10 Promotions]
+      summary: Số liệu phát/sử dụng từ DB (F10UC02.3)
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: '#/components/parameters/id' }]
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties:
+                      data: { $ref: '#/components/schemas/PromotionRealtimeResponse' }
+        '404': { $ref: '#/components/responses/Error' }
+  /api/v1/f10/promotions/{id}/applications:
+    post:
+      tags: [F10 Promotions]
+      summary: Áp dụng khuyến mãi cho hóa đơn [Supplemental] (F10UC02.3)
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: '#/components/parameters/id' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ApplyPromotionRequest' }
+      responses:
+        '201': { $ref: '#/components/responses/Error' }
+        '400': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+        '503': { $ref: '#/components/responses/Error' }
+  /api/v1/f10/vouchers:
+    post:
+      tags: [F10 Vouchers]
+      summary: Tạo kho voucher (F10UC02.2)
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateVoucherRequest' }
+      responses:
+        '201': { $ref: '#/components/responses/Error' }
+        '400': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+  /api/v1/f10/vouchers/{id}/issues:
+    post:
+      tags: [F10 Vouchers]
+      summary: Phát voucher cho khách [Supplemental] (F10UC02.3)
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: '#/components/parameters/id' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/IssueVoucherRequest' }
+      responses:
+        '201': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+        '503': { $ref: '#/components/responses/Error' }
+  /api/v1/f10/voucher-instances/{id}/redemptions:
+    post:
+      tags: [F10 Vouchers]
+      summary: Dùng voucher [Supplemental]
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: '#/components/parameters/id' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RedeemVoucherRequest' }
+      responses:
+        '200': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+  /api/v1/f10/promotions-events/search:
+    get:
+      tags: [F10 Public]
+      summary: Tra cứu công khai sự kiện/khuyến mãi (F10UC03)
+      security: []
+      parameters:
+        - { name: q, in: query, schema: { type: string } }
+        - { name: category, in: query, schema: { type: string, enum: [EVENT, PROMOTION] } }
+        - { $ref: '#/components/parameters/page' }
+        - { $ref: '#/components/parameters/size' }
+      responses:
+        '200':
+          description: Phân trang hợp nhất EVENT/PROMOTION, chỉ dữ liệu công khai
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          content:
+                            type: array
+                            items: { $ref: '#/components/schemas/PublicItem' }
+                          page: { type: integer }
+                          size: { type: integer }
+                          totalElements: { type: integer }
+components:
+  securitySchemes:
+    bearerAuth: { type: http, scheme: bearer, bearerFormat: JWT }
+  parameters:
+    id: { name: id, in: path, required: true, schema: { $ref: '#/components/schemas/UUID' } }
+    page: { name: page, in: query, schema: { type: integer, minimum: 0, default: 0 } }
+    size: { name: size, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 20 } }
+    q: { name: q, in: query, schema: { type: string, maxLength: 100 } }
+    zoneId: { name: zoneId, in: query, schema: { $ref: '#/components/schemas/UUID' } }
+    statusQuery: { name: status, in: query, schema: { $ref: '#/components/schemas/PremiseStatus' } }
+  schemas:
+    UUID: { type: string, format: uuid }
+    Envelope:
+      type: object
+      required: [code, message]
+      properties:
+        code: { type: integer }
+        message: { type: string }
+        data: {}
+    ApiError:
+      type: object
+      required: [code, message, errorCode]
+      properties:
+        code: { type: integer }
+        message: { type: string }
+        errorCode: { type: string, example: VALIDATION_ERROR }
+        errors:
+          type: array
+          items:
+            type: object
+            properties:
+              field: { type: string }
+              message: { type: string }
+        traceId: { type: string }
+    PremiseStatus:
+      type: string
+      enum: [VACANT, RESERVED, LEASED, MAINTENANCE, SUSPENDED, RETIRED]
+    StoreStatus:
+      type: string
+      enum: [VACANT, RESERVED, LEASED, MAINTENANCE, SUSPENDED, RETIRED]
+    PremiseType:
+      type: string
+      enum: [STORE, KIOSK, ADVERTISING, EVENT_AREA, SERVICE_AREA, OTHER]
+    EventStatus:
+      type: string
+      enum: [DRAFT, PENDING_APPROVAL, APPROVED, REJECTED, ONGOING, FINISHED, CANCELLED]
+    PromotionType:
+      type: string
+      enum: [DISCOUNT, VOUCHER_GIVEAWAY, POINT_ACCUMULATION]
+    PromotionStatus:
+      type: string
+      enum: [DRAFT, SCHEDULED, ACTIVE, FINISHED, CANCELLED]
+    VoucherDiscountType:
+      type: string
+      enum: [FIXED_AMOUNT, PERCENTAGE]
+    CreatePremiseRequest:
+      type: object
+      required: [code, name, zoneId, totalArea, status]
+      properties:
+        code: { type: string, maxLength: 50 }
+        name: { type: string, maxLength: 200 }
+        zoneId: { $ref: '#/components/schemas/UUID' }
+        totalArea: { type: number, exclusiveMinimum: 0 }
+        type: { $ref: '#/components/schemas/PremiseType' }
+        status: { $ref: '#/components/schemas/PremiseStatus' }
+        locationId: { $ref: '#/components/schemas/UUID' }
+        description: { type: string, maxLength: 1000 }
+    UpdatePremiseRequest:
+      type: object
+      required: [name, zoneId, totalArea, version]
+      properties:
+        name: { type: string, maxLength: 200 }
+        zoneId: { $ref: '#/components/schemas/UUID' }
+        totalArea: { type: number, exclusiveMinimum: 0 }
+        type: { $ref: '#/components/schemas/PremiseType' }
+        description: { type: string, maxLength: 1000 }
+        version: { type: integer, format: int64, minimum: 0 }
+    UpdatePremiseLocationRequest:
+      type: object
+      required: [locationId]
+      properties:
+        locationId: { $ref: '#/components/schemas/UUID' }
+        reason: { type: string, maxLength: 500 }
+    ChangeStatusRequest:
+      type: object
+      required: [status, version]
+      properties:
+        status: { $ref: '#/components/schemas/PremiseStatus' }
+        reason: { type: string, maxLength: 500 }
+        version: { type: integer, format: int64, minimum: 0 }
+    ChangeStoreStatusRequest:
+      type: object
+      required: [status, version]
+      properties:
+        status: { $ref: '#/components/schemas/StoreStatus' }
+        reason: { type: string, maxLength: 500 }
+        version: { type: integer, format: int64, minimum: 0 }
+    CreateStoreRequest:
+      type: object
+      required: [code, name, premiseId, area, status]
+      properties:
+        code: { type: string, maxLength: 50 }
+        name: { type: string, maxLength: 200 }
+        premiseId: { $ref: '#/components/schemas/UUID' }
+        area: { type: number, exclusiveMinimum: 0 }
+        categoryId: { $ref: '#/components/schemas/UUID' }
+        locationId: { $ref: '#/components/schemas/UUID' }
+        status: { $ref: '#/components/schemas/StoreStatus' }
+        operatingHours: { type: string, maxLength: 200 }
+        description: { type: string, maxLength: 1000 }
+        publicVisible: { type: boolean, default: false }
+    UpdateStoreRequest:
+      type: object
+      required: [name, version]
+      properties:
+        name: { type: string, maxLength: 200 }
+        premiseId: { $ref: '#/components/schemas/UUID' }
+        area: { type: number, exclusiveMinimum: 0 }
+        categoryId: { $ref: '#/components/schemas/UUID' }
+        locationId: { $ref: '#/components/schemas/UUID' }
+        operatingHours: { type: string, maxLength: 200 }
+        description: { type: string, maxLength: 1000 }
+        publicVisible: { type: boolean }
+        version: { type: integer, format: int64, minimum: 0 }
+    UtilizationItem:
+      type: object
+      properties:
+        id: { $ref: '#/components/schemas/UUID' }
+        code: { type: string }
+        name: { type: string }
+        zoneName: { type: string }
+        floorName: { type: string }
+        buildingName: { type: string }
+        totalArea: { type: number }
+        allocatedArea: { type: number }
+        status: { $ref: '#/components/schemas/PremiseStatus' }
+    CreateEventProposalRequest:
+      type: object
+      required: [code, name, locationId, startAt, endAt, estimatedBudget, targetAttendees]
+      properties:
+        code: { type: string, maxLength: 50 }
+        name: { type: string, maxLength: 200 }
+        type: { type: string, maxLength: 100 }
+        locationId: { $ref: '#/components/schemas/UUID' }
+        startAt: { type: string, format: date-time }
+        endAt: { type: string, format: date-time }
+        estimatedBudget: { type: number, minimum: 0 }
+        targetAttendees: { type: integer, minimum: 0 }
+        publicVisible: { type: boolean, default: false }
+        participatingStoreIds:
+          type: array
+          items: { $ref: '#/components/schemas/UUID' }
+        proposalFileKeys:
+          type: array
+          maxItems: 10
+          items: { type: string, maxLength: 300 }
+    ApproveEventRequest:
+      type: object
+      required: [action]
+      properties:
+        action: { type: string, enum: [APPROVE, REJECT] }
+        approvedBudget: { type: number, minimum: 0 }
+        rejectionReason: { type: string, maxLength: 500 }
+        note: { type: string, maxLength: 500 }
+    CreateActivityRequest:
+      type: object
+      required: [name, startAt, endAt, locationId]
+      properties:
+        name: { type: string, maxLength: 200 }
+        startAt: { type: string, format: date-time }
+        endAt: { type: string, format: date-time }
+        locationId: { $ref: '#/components/schemas/UUID' }
+        personInCharge: { $ref: '#/components/schemas/UUID' }
+        description: { type: string, maxLength: 1000 }
+    QrCodeResponse:
+      type: object
+      properties:
+        qrCodeId: { $ref: '#/components/schemas/UUID' }
+        checkInUrl: { type: string, description: Chứa token, chỉ trả cho actor có quyền }
+        imageStorageKey: { type: string }
+        expiresAt: { type: string, format: date-time }
+        active: { type: boolean }
+    CheckInRequest:
+      type: object
+      required: [qrToken]
+      properties:
+        qrToken: { type: string, description: Token gốc từ URL QR; server hash trước khi đối chiếu }
+        customerId: { $ref: '#/components/schemas/UUID', description: Bắt buộc với nhân viên hỗ trợ; khách tự check-in lấy từ danh tính }
+        scanningDevice: { type: string, maxLength: 200 }
+    CreateExpenseRequest:
+      type: object
+      required: [amount]
+      properties:
+        supplierName: { type: string, maxLength: 200 }
+        invoiceNumber: { type: string, maxLength: 100 }
+        amount: { type: number, exclusiveMinimum: 0 }
+        incurredAt: { type: string, format: date-time }
+        attachmentId: { $ref: '#/components/schemas/UUID' }
+        description: { type: string, maxLength: 1000 }
+    EventReportResponse:
+      type: object
+      properties:
+        eventId: { $ref: '#/components/schemas/UUID' }
+        eventName: { type: string }
+        status: { $ref: '#/components/schemas/EventStatus' }
+        approvedBudget: { type: number, nullable: true }
+        estimatedBudget: { type: number, nullable: true }
+        totalActualExpense: { type: number }
+        budgetVariance: { type: number, description: approvedBudget - totalActualExpense; null khi chưa duyệt }
+        targetAttendees: { type: integer, nullable: true }
+        actualAttendees: { type: integer, description: Số khách duy nhất đã check-in }
+        attendanceRate: { type: number, nullable: true, description: Phần trăm; null khi targetAttendees = 0 hoặc null }
+        roiPercentage: { type: number, nullable: true, description: Null khi thiếu doanh thu quy thuộc hoặc chi phí = 0 }
+        roiStatus: { type: string, enum: [NOT_AVAILABLE, PENDING_REVENUE, ZERO_COST, CALCULATED] }
+    CreatePromotionRequest:
+      type: object
+      required: [code, name, type, startAt, endAt]
+      properties:
+        code: { type: string, maxLength: 50 }
+        name: { type: string, maxLength: 200 }
+        type: { $ref: '#/components/schemas/PromotionType' }
+        startAt: { type: string, format: date-time }
+        endAt: { type: string, format: date-time }
+        minimumInvoiceAmount: { type: number, minimum: 0 }
+        targetTiers: { type: array, items: { type: string } }
+        terms: { type: string }
+        publicVisible: { type: boolean, default: false }
+        participatingStoreIds: { type: array, items: { $ref: '#/components/schemas/UUID' } }
+        discount:
+          type: object
+          description: Bắt buộc khi type=DISCOUNT
+          properties:
+            discountRatePercent: { type: number, minimum: 0, exclusiveMaximum: 100, example: 15 }
+            maximumDiscount: { type: number, minimum: 0 }
+        giveaway:
+          type: object
+          description: Bắt buộc khi type=VOUCHER_GIVEAWAY
+          properties:
+            voucherId: { $ref: '#/components/schemas/UUID' }
+            totalToIssue: { type: integer, minimum: 0 }
+        points:
+          type: object
+          description: Bắt buộc khi type=POINT_ACCUMULATION
+          properties:
+            rewardPoints: { type: integer, minimum: 0 }
+            conversionAmount: { type: number, minimum: 0 }
+            pointsPerConversion: { type: integer, minimum: 0 }
+    PromotionRealtimeResponse:
+      type: object
+      properties:
+        promotionId: { $ref: '#/components/schemas/UUID' }
+        type: { $ref: '#/components/schemas/PromotionType' }
+        totalLimit: { type: integer, nullable: true, description: Null = không giới hạn }
+        issuedCount: { type: integer }
+        remainingStock: { type: integer, nullable: true, description: Null khi không giới hạn }
+        usedCount: { type: integer }
+        totalDiscountGranted: { type: number }
+        totalPointsGranted: { type: integer }
+        lastUpdated: { type: string, format: date-time }
+    ApplyPromotionRequest:
+      type: object
+      required: [invoiceId, customerId, idempotencyKey]
+      properties:
+        invoiceId: { $ref: '#/components/schemas/UUID' }
+        customerId: { $ref: '#/components/schemas/UUID' }
+        customerVoucherId: { $ref: '#/components/schemas/UUID', description: Bắt buộc khi dùng voucher }
+        idempotencyKey: { type: string, maxLength: 120 }
+    CreateVoucherRequest:
+      type: object
+      required: [code, name, discountType, value, validFrom, expiresAt]
+      properties:
+        code:
+          type: string
+          maxLength: 50
+          pattern: '^[A-Z0-9]+$'
+          description: Viết hoa, chỉ chữ/số (allowlist chốt trong D0004)
+        name: { type: string, maxLength: 200 }
+        discountType: { $ref: '#/components/schemas/VoucherDiscountType' }
+        value: { type: number, exclusiveMinimum: 0, description: FIXED_AMOUNT là tiền; PERCENTAGE theo thang 0..100 }
+        maximumDiscount: { type: number, minimum: 0, description: Bắt buộc khi PERCENTAGE }
+        minimumInvoiceAmount: { type: number, minimum: 0 }
+        issuedLimit: { type: integer, minimum: 0, description: 0 = không giới hạn }
+        perCustomerLimit: { type: integer, minimum: 0, description: 0 = không giới hạn }
+        validFrom: { type: string, format: date-time }
+        expiresAt: { type: string, format: date-time }
+        participatingStoreIds: { type: array, items: { $ref: '#/components/schemas/UUID' } }
+    IssueVoucherRequest:
+      type: object
+      required: [customerId]
+      properties:
+        customerId: { $ref: '#/components/schemas/UUID' }
+        issueReference: { type: string, maxLength: 200, description: Idempotency cho phát theo đợt }
+    RedeemVoucherRequest:
+      type: object
+      required: [invoiceId]
+      properties:
+        invoiceId: { $ref: '#/components/schemas/UUID' }
+        idempotencyKey: { type: string, maxLength: 120 }
+    PublicItem:
+      type: object
+      properties:
+        id: { $ref: '#/components/schemas/UUID' }
+        title: { type: string }
+        category: { type: string, enum: [EVENT, PROMOTION] }
+        type: { type: string, nullable: true }
+        startAt: { type: string, format: date-time }
+        endAt: { type: string, format: date-time }
+        location: { type: string, nullable: true, description: Mô tả vị trí, không có mã nội bộ }
+  responses:
+    PremisePage:
+      description: Trang mặt bằng
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: '#/components/schemas/Envelope'
+              - type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      content:
+                        type: array
+                        items: { $ref: '#/components/schemas/PremiseListItem' }
+                      page: { type: integer }
+                      size: { type: integer }
+                      totalElements: { type: integer }
+    PremiseListItem:
+      type: object
+      properties:
+        id: { $ref: '#/components/schemas/UUID' }
+        code: { type: string }
+        name: { type: string }
+        zoneId: { $ref: '#/components/schemas/UUID' }
+        zoneName: { type: string }
+        totalArea: { type: number }
+        type: { $ref: '#/components/schemas/PremiseType' }
+        status: { $ref: '#/components/schemas/PremiseStatus' }
+    PremiseDetail:
+      description: Chi tiết mặt bằng
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: '#/components/schemas/Envelope'
+              - type: object
+                properties:
+                  data:
+                    allOf:
+                      - $ref: '#/components/schemas/PremiseListItem'
+                      - type: object
+                        properties:
+                          description: { type: string, nullable: true }
+                          locationId: { $ref: '#/components/schemas/UUID', nullable: true }
+                          version: { type: integer }
+    PremiseCreated:
+      description: Mặt bằng đã tạo
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: '#/components/schemas/Envelope'
+              - type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      id: { $ref: '#/components/schemas/UUID' }
+                      code: { type: string }
+                      status: { $ref: '#/components/schemas/PremiseStatus' }
+    PremiseUpdated:
+      description: Cập nhật thành công
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: '#/components/schemas/Envelope'
+              - type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      id: { $ref: '#/components/schemas/UUID' }
+                      version: { type: integer }
+    StatusPage:
+      description: Trạng thái hiện hành
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: '#/components/schemas/Envelope'
+              - type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      content:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            id: { $ref: '#/components/schemas/UUID' }
+                            code: { type: string }
+                            name: { type: string }
+                            status: { $ref: '#/components/schemas/PremiseStatus' }
+                      page: { type: integer }
+                      size: { type: integer }
+                      totalElements: { type: integer }
+    StorePage:
+      description: Trang cửa hàng
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: '#/components/schemas/Envelope'
+              - type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      content:
+                        type: array
+                        items: { $ref: '#/components/schemas/StoreListItem' }
+                      page: { type: integer }
+                      size: { type: integer }
+                      totalElements: { type: integer }
+    StoreListItem:
+      type: object
+      properties:
+        id: { $ref: '#/components/schemas/UUID' }
+        code: { type: string }
+        name: { type: string }
+        premiseId: { $ref: '#/components/schemas/UUID' }
+        premiseCode: { type: string }
+        area: { type: number }
+        categoryId: { $ref: '#/components/schemas/UUID' }
+        status: { $ref: '#/components/schemas/StoreStatus' }
+        publicVisible: { type: boolean }
+    HistoryPage:
+      description: Trang lịch sử
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: '#/components/schemas/Envelope'
+              - type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      content:
+                        type: array
+                        items: { $ref: '#/components/schemas/HistoryItem' }
+                      page: { type: integer }
+                      size: { type: integer }
+                      totalElements: { type: integer }
+    HistoryItem:
+      type: object
+      properties:
+        id: { $ref: '#/components/schemas/UUID' }
+        targetType: { type: string }
+        targetId: { $ref: '#/components/schemas/UUID' }
+        action: { type: string }
+        oldValueJson: { type: string, nullable: true }
+        newValueJson: { type: string, nullable: true }
+        changedBy: { $ref: '#/components/schemas/UUID', nullable: true }
+        reason: { type: string, nullable: true }
+        createdAt: { type: string, format: date-time }
+    EventSummary:
+      type: object
+      properties:
+        id: { $ref: '#/components/schemas/UUID' }
+        code: { type: string }
+        name: { type: string }
+        status: { $ref: '#/components/schemas/EventStatus' }
+        estimatedBudget: { type: number }
+        proposedBy: { $ref: '#/components/schemas/UUID' }
+        createdAt: { type: string, format: date-time }
+    Error:
+      description: Lỗi theo envelope chuẩn
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ApiError' }

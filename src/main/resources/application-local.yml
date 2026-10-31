@@ -1,0 +1,10 @@
+# PROFILE LOCAL - co the co stub co nhan: xac thuc qua header thay JWT.
+# Tuyet doi khong bat o production (xem docs/decisions/0008).
+aneon:
+  security:
+    jwt-enabled: false
+    local-identity-enabled: true
+
+logging:
+  level:
+    com.company.aneon: DEBUG

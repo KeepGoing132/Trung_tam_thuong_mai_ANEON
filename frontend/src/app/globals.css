@@ -1,0 +1,131 @@
+@import "tailwindcss";
+
+/* ============================================================
+   AEON MALL — Design tokens
+   Hệ thiết kế lấy tinh thần Daylight (nền kem, display lớn,
+   gradient động, editorial) nhưng dùng màu nhận diện AEON.
+   ============================================================ */
+@theme {
+  --color-cream: #fbf6ed;
+  --color-cream-deep: #f2e9db;
+  --color-cream-line: #e7dcc9;
+  --color-ink: #1a1412;
+  --color-ink-soft: #57504a;
+  --color-magenta: #e5007e;
+  --color-magenta-deep: #b40063;
+  --color-plum: #3d122f;
+  --color-gold: #e8a33d;
+  --color-violet: #7b3fe4;
+  --color-coral: #ff6a3d;
+
+  --font-display: var(--font-fraunces), Georgia, "Times New Roman", serif;
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+
+  --ease-soft: cubic-bezier(0.22, 1, 0.36, 1);
+
+  --animate-gradient-pan: gradient-pan 14s ease-in-out infinite alternate;
+  --animate-marquee: marquee 28s linear infinite;
+  --animate-hero-zoom: hero-zoom 16s ease-in-out infinite alternate;
+}
+
+@keyframes gradient-pan {
+  0% {
+    background-position: 0% 40%;
+  }
+  100% {
+    background-position: 100% 60%;
+  }
+}
+
+@keyframes marquee {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+@keyframes hero-zoom {
+  from {
+    transform: scale(1.02);
+  }
+  to {
+    transform: scale(1.1);
+  }
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background-color: var(--color-cream);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+::selection {
+  background: var(--color-magenta);
+  color: #fff;
+}
+
+/* Gradient động đa sắc — điểm nhấn chuyển động của thương hiệu.
+   Chi dùng làm frame/ribbon trên ảnh hoặc section hero (không đè logo). */
+.aeon-gradient {
+  background-image: linear-gradient(
+    100deg,
+    var(--color-magenta),
+    var(--color-coral),
+    var(--color-gold),
+    var(--color-violet),
+    var(--color-magenta)
+  );
+  background-size: 300% 300%;
+  animation: var(--animate-gradient-pan);
+}
+
+/* Nút: hiệu ứng nền trượt từ dưới lên khi hover */
+.btn-slide {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+}
+.btn-slide::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: var(--slide-color, var(--color-ink));
+  transform: translateY(101%);
+  transition: transform 0.45s var(--ease-soft);
+}
+.btn-slide:hover::before,
+.btn-slide:focus-visible::before {
+  transform: translateY(0);
+}
+
+/* Chuyển động giảm khi người dùng yêu cầu */
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  .aeon-gradient {
+    animation: none;
+  }
+  .marquee-track {
+    animation: none !important;
+  }
+  .hero-zoom-img {
+    animation: none !important;
+  }
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}

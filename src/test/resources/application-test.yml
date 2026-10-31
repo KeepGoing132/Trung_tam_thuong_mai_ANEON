@@ -1,0 +1,7 @@
+# Profile test: JWT tat, stub local identity bat (co nhan), stub F03/F18 o
+# profile test. Du lieu xac thuc test truyen qua header X-Actor-*.
+aneon:
+  security:
+    jwt-enabled: false
+    local-identity-enabled: true
+  public-checkin-base-url: https://aneon.local/checkin

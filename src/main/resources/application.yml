@@ -1,0 +1,47 @@
+spring:
+  application:
+    name: aneon-backend
+  datasource:
+    url: ${ANEON_DB_URL:jdbc:mysql://localhost:3306/qldapm_aneon?connectionTimeZone=UTC&forceConnectionTimeZoneToSession=true&characterEncoding=UTF-8&useSSL=false&allowPublicKeyRetrieval=true}
+    username: ${ANEON_DB_USERNAME:root}
+    password: ${ANEON_DB_PASSWORD:}
+    hikari:
+      maximum-pool-size: 10
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+  jackson:
+    time-zone: UTC
+    default-property-inclusion: non_null
+  servlet:
+    multipart:
+      max-file-size: 25MB
+      max-request-size: 260MB
+
+server:
+  error:
+    include-stacktrace: never
+
+aneon:
+  business-time-zone: ${ANEON_BUSINESS_TZ:Asia/Ho_Chi_Minh}
+  public-checkin-base-url: ${ANEON_PUBLIC_CHECKIN_BASE_URL:}
+  upload:
+    max-files-per-proposal: 10
+    max-file-bytes: 26214400
+    allowed-extensions: pdf, docx, png, jpg, jpeg
+  security:
+    jwt-enabled: ${ANEON_JWT_ENABLED:false}
+    jwt-issuer: ${ANEON_JWT_ISSUER:}
+    local-identity-enabled: ${ANEON_LOCAL_IDENTITY:false}
+
+logging:
+  level:
+    com.company.aneon: INFO
