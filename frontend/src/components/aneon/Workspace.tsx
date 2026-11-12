@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useState } from "react";
 import { formatDate, type Identity } from "@/lib/aneon-api";
 import { EventsWorkspace } from "./EventsWorkspace";
@@ -22,16 +23,30 @@ const views: { id: View; label: string; group: "F01" | "F10"; roles: string[] }[
   { id: "assist", label: "Hỗ trợ check-in", group: "F10", roles: ["OPERATIONS", "MARKETING"] },
 ];
 const groups = { F01: "Quản lý mặt bằng", F10: "Sự kiện & khuyến mãi" } as const;
+const atriumPhoto = "/aneon/mall-atrium.webp";
+const eventPhoto = "/aneon/mall-event.webp";
 
 export function Workspace() {
   const [identity, setIdentity] = useState<Identity>();
   const [view, setView] = useState<View>();
 
-  if (!identity) return <section className={`${panel} max-w-xl`}>
-    <h2 className="mb-2 text-lg font-semibold">Kết nối tài khoản nhân viên</h2>
-    <p className="mb-5 text-sm text-ink-soft">Dùng tài khoản được cấp quyền cho nghiệp vụ bạn phụ trách.</p>
-    <IdentityForm onConnect={(next) => { setView(undefined); setIdentity(next); }} />
-  </section>;
+  if (!identity) return (
+    <div className="grid overflow-hidden rounded-[1.75rem] border border-cream-line bg-white shadow-sm md:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)]">
+      <div className="relative isolate flex min-h-52 items-end overflow-hidden bg-plum p-6 text-white sm:min-h-64 sm:p-8 md:min-h-[33rem] lg:p-11">
+        <Image src={atriumPhoto} alt="" fill priority unoptimized sizes="(min-width: 768px) 58vw, 100vw"
+          className="-z-20 object-cover object-[60%_54%]" />
+        <div className="absolute inset-0 -z-10 bg-linear-to-t from-[#21111de8] via-[#35172e33] to-transparent" />
+        <h1 className="font-display text-4xl leading-tight tracking-tight sm:text-5xl lg:text-6xl">Quản lý ANEON</h1>
+      </div>
+      <section aria-labelledby="identity-heading" className="flex items-center p-6 sm:p-8 lg:p-11">
+        <div className="mx-auto w-full max-w-md">
+          <h2 id="identity-heading" className="mb-2 font-display text-2xl text-plum sm:text-3xl">Kết nối tài khoản nhân viên</h2>
+          <p className="mb-6 text-sm leading-relaxed text-ink-soft">Dùng tài khoản được cấp quyền cho nghiệp vụ bạn phụ trách.</p>
+          <IdentityForm onConnect={(next) => { setView(undefined); setIdentity(next); }} />
+        </div>
+      </section>
+    </div>
+  );
 
   const available = views.filter(({ roles }) => allowed(identity, ...roles));
   const current = available.find(({ id }) => id === view) ?? available[0];
@@ -57,7 +72,17 @@ export function Workspace() {
       </nav>
     </aside>
     <section className="grid min-w-0 gap-4" aria-labelledby="view-heading">
-      <h2 id="view-heading" className="font-display text-3xl text-plum">{current?.label ?? "Nghiệp vụ"}</h2>
+      <header className="relative isolate flex min-h-32 items-center overflow-hidden rounded-2xl bg-plum px-5 py-6 text-white sm:px-8">
+        <div className="absolute inset-y-0 right-0 -z-20 w-2/3">
+          <Image src={current?.group === "F10" ? eventPhoto : atriumPhoto} alt="" fill unoptimized
+            sizes="(min-width: 1024px) 50vw, 67vw" className="object-cover object-[70%_55%]" />
+        </div>
+        <div className="absolute inset-0 -z-10 bg-[linear-gradient(90deg,#3d122f_30%,#3d122fe6_49%,#3d122f29_100%)]" />
+        <div>
+          <p className="mb-1 text-xs font-semibold text-[#f5d9eb]">Quản lý ANEON</p>
+          <h1 id="view-heading" className="font-display text-3xl leading-tight sm:text-4xl">{current?.label ?? "Nghiệp vụ"}</h1>
+        </div>
+      </header>
       {!current && <p className={panel}>Vai trò này chưa có quyền trên màn hình quản lý.</p>}
       {current?.group === "F01" && <PremisesWorkspace identity={identity} view={current.id as PremisesView} key={current.id} />}
       {current?.id === "events" && <EventsWorkspace identity={identity} />}
