@@ -172,10 +172,7 @@ public class PromotionServiceImpl implements PromotionService {
         ChuongTrinhKhuyenMai program = promotionRepository.findAnyById(promotionId)
                 .filter(p -> p.getArchivedAt() == null)
                 .orElseThrow(() -> ApiException.notFound("Chuong trinh", promotionId));
-        Object[] aggregate = applicationRepository.aggregateByPromotion(promotionId);
-        long applyCount = ((Number) aggregate[0]).longValue();
-        BigDecimal totalDiscount = (BigDecimal) aggregate[1];
-        long totalPoints = aggregate[2] == null ? 0 : ((Number) aggregate[2]).longValue();
+        var aggregate = applicationRepository.aggregateByPromotion(promotionId);
 
         Integer totalLimit = null;
         Integer issuedCount = null;
@@ -188,7 +185,8 @@ public class PromotionServiceImpl implements PromotionService {
                     : Math.max(totalLimit - issuedCount, 0);
         }
         return new PromotionDtos.PromotionRealtimeResponse(promotionId, program.getType(),
-                totalLimit, issuedCount, remaining, (int) applyCount, totalDiscount, totalPoints,
+                totalLimit, issuedCount, remaining, (int) aggregate.getApplyCount(),
+                aggregate.getTotalDiscount(), aggregate.getTotalPoints(),
                 Instant.now(clock));
     }
 
@@ -199,7 +197,7 @@ public class PromotionServiceImpl implements PromotionService {
                 .filter(p -> p.getArchivedAt() == null)
                 .orElseThrow(() -> ApiException.notFound("Chuong trinh", promotionId));
         Instant now = Instant.now(clock);
-        if (program.getStatus() != PromotionStatus.ACTIVE
+        if ((program.getStatus() != PromotionStatus.ACTIVE && program.getStatus() != PromotionStatus.SCHEDULED)
                 || program.getStartAt() == null || now.isBefore(program.getStartAt())
                 || program.getEndAt() == null || now.isAfter(program.getEndAt())) {
             throw ApiException.conflict("Chuong trinh khong trong thoi gian ap dung");

@@ -20,8 +20,6 @@ export const IMAGES = {
   funA: u("1511882150382-421056c89033", 1000),
   funB: u("1513106580091-1d82408b8cd6", 1000),
   eventA: u("1533174072545-7a4b6ad7a6c3", 1400),
-  eventB: u("1492684223066-81342ee5ff30", 1000),
-  promo: u("1513885535751-8b9238bd345a", 1200),
   supermarket: u("1542838132-92c53300491e", 1200),
   giftToast: u("1519671482749-fd09be7ccebf", 900),
 };
@@ -30,8 +28,8 @@ export const NAV = [
   { label: "Giới thiệu", href: "#gioi-thieu" },
   { label: "Gian hàng", href: "#gian-hang" },
   { label: "Mua sắm & Ẩm thực", href: "#mua-sam-am-thuc" },
-  { label: "Ưu đãi", href: "#uu-dai" },
-  { label: "Sự kiện", href: "#su-kien" },
+  { label: "Ưu đãi", href: "/kham-pha?danh-muc=PROMOTION" },
+  { label: "Sự kiện", href: "/kham-pha?danh-muc=EVENT" },
   { label: "Tiện ích", href: "#tien-ich" },
 ];
 
@@ -104,82 +102,6 @@ export const DINING_TILES = [
   { image: IMAGES.diningA, label: "Cà phê & trà chiều", tag: "Tầng 1 — 12 quán" },
   { image: IMAGES.diningB, label: "Fine dining", tag: "Tầng 2 — nhà hàng sang trọng" },
 ];
-
-export const PROMOS = [
-  {
-    id: "pr-01",
-    tag: "Ưu đãi thành viên",
-    title: "Săn voucher 500.000đ mùa lễ hội",
-    period: "01.11 — 24.12",
-    detail: "Chi tiêu đủ 2.000.000đ nhận ngay voucher AEON Supermarket.",
-  },
-  {
-    id: "pr-02",
-    tag: "Thời trang",
-    title: "Giảm đến 50% bộ sưu tập Thu–Đông",
-    period: "Toàn tháng 11",
-    detail: "Áp dụng cho hơn 60 gian hàng thời trang tham gia chương trình.",
-  },
-  {
-    id: "pr-03",
-    tag: "Ẩm thực",
-    title: "Buffet tối thứ Tư — mua 1 tặng 1",
-    period: "Mỗi thứ Tư",
-    detail: "Nhà hàng Sakura Terrace và 8 quán ăn đối tác trên tầng 2.",
-  },
-  {
-    id: "pr-04",
-    tag: "Gia đình",
-    title: "Tích điểm đổi vé rạp & khu chơi",
-    period: "01.11 — 30.11",
-    detail: "Mỗi 100.000đ hóa đơn đổi 1 điểm — 30 điểm đổi 1 vé.",
-  },
-];
-
-export const EVENTS = [
-  {
-    id: "ev-01",
-    day: "08",
-    month: "TH11",
-    tag: "Lễ hội",
-    title: "Lễ hội Ánh Sáng Cuối Năm",
-    place: "Quảng trường trung tâm",
-    time: "17:00 — 22:00",
-    image: IMAGES.eventA,
-  },
-  {
-    id: "ev-02",
-    day: "15",
-    month: "TH11",
-    tag: "Âm nhạc",
-    title: "Đêm nhạc Acoustic cuối tuần",
-    place: "Sảnh chính, tầng 1",
-    time: "19:30 — 21:30",
-    image: IMAGES.eventB,
-  },
-  {
-    id: "ev-03",
-    day: "22",
-    month: "TH11",
-    tag: "Giải trí",
-    title: "Neon Game Weekend — Thử thách VR",
-    place: "Neon Play Arena, tầng 3",
-    time: "10:00 — 21:00",
-    image: IMAGES.funA,
-  },
-  {
-    id: "ev-04",
-    day: "29",
-    month: "TH11",
-    tag: "Workshop",
-    title: "Workshop Phối đồ Thu–Đông",
-    place: "Boutique Atelier Rivière, tầng 1",
-    time: "14:00 — 16:00",
-    image: IMAGES.shoppingB,
-  },
-];
-
-export const EVENT_TAGS = ["Tất cả", "Lễ hội", "Âm nhạc", "Giải trí", "Workshop"] as const;
 
 export const FACILITIES = [
   {

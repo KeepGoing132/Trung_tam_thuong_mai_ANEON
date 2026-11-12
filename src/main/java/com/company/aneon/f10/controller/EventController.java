@@ -2,11 +2,14 @@ package com.company.aneon.f10.controller;
 
 import java.util.UUID;
 
+import com.company.aneon.f10.constant.EventStatus;
 import com.company.aneon.f10.dto.EventDtos;
 import com.company.aneon.f10.service.EventService;
 import com.company.aneon.f10.service.QrCodeService;
 import com.company.aneon.shared.security.RolePermissions;
 import com.company.aneon.shared.web.ApiResponse;
+import com.company.aneon.shared.web.PageParams;
+import com.company.aneon.shared.web.PageResponse;
 
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -16,6 +19,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import jakarta.validation.Valid;
@@ -89,6 +93,17 @@ public class EventController {
         return ResponseEntity.status(201)
                 .body(ApiResponse.created("Ghi chi phi thanh cong",
                         eventService.recordExpense(id, request)));
+    }
+
+    @GetMapping
+    @PreAuthorize("hasAuthority('" + RolePermissions.F10_EVENT_READ + "')")
+    public ApiResponse<PageResponse<EventDtos.EventSummary>> search(
+            @RequestParam(required = false) String q,
+            @RequestParam(required = false) EventStatus status,
+            @RequestParam(required = false) Integer page,
+            @RequestParam(required = false) Integer size) {
+        return ApiResponse.ok("Tra cuu su kien thanh cong",
+                eventService.search(q, status, PageParams.page(page), PageParams.size(size)));
     }
 
     @GetMapping("/{id}")

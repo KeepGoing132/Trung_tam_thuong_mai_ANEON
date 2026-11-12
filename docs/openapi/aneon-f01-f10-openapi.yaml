@@ -302,6 +302,42 @@ paths:
                           totalElements: { type: integer }
         '400': { $ref: '#/components/responses/Error' }
         '403': { $ref: '#/components/responses/Error' }
+  /api/v1/f10/events:
+    get:
+      tags: [F10 Events]
+      summary: Tra cứu danh sách sự kiện nội bộ trong phạm vi được cấp quyền
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: q, in: query, schema: { type: string }, description: Tên hoặc mã sự kiện }
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [DRAFT, PENDING_APPROVAL, APPROVED, REJECTED, ONGOING, FINISHED, CANCELLED]
+        - { $ref: '#/components/parameters/page' }
+        - { $ref: '#/components/parameters/size' }
+      responses:
+        '200':
+          description: Trang sự kiện chưa lưu trữ, mới nhất trước
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          content:
+                            type: array
+                            items: { $ref: '#/components/schemas/EventSummary' }
+                          page: { type: integer }
+                          size: { type: integer }
+                          totalElements: { type: integer, format: int64 }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
   /api/v1/f10/events/proposals:
     post:
       tags: [F10 Events]

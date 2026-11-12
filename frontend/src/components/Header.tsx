@@ -73,6 +73,9 @@ export default function Header() {
         </nav>
 
         <div className="flex items-center gap-3">
+          <a href="/quan-ly" className={`hidden text-[13px] font-semibold lg:inline-flex ${scrolled ? "text-magenta-deep" : "text-cream"}`}>
+            Quản lý
+          </a>
           <a
             href="#gian-hang"
             className={`btn-slide hidden h-11 items-center rounded-full border px-6 text-[13px] font-semibold transition-colors md:inline-flex ${
@@ -116,7 +119,7 @@ export default function Header() {
             animate={{ opacity: 1, y: 0 }}
             exit={reduce ? undefined : { opacity: 0, y: -12 }}
             transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
-            className="fixed inset-0 top-0 z-40 flex flex-col bg-plum px-6 pb-10 pt-28 lg:hidden"
+            className="fixed inset-x-0 top-full z-40 flex max-h-[calc(100dvh-5rem)] flex-col overflow-y-auto bg-plum px-6 pb-8 lg:hidden"
             aria-label="Menu di động"
           >
             {NAV.map((item, i) => (
@@ -132,6 +135,7 @@ export default function Header() {
                 {item.label}
               </motion.a>
             ))}
+            <a href="/quan-ly" onClick={() => setOpen(false)} className="border-b border-cream/10 py-5 font-display text-3xl text-cream">Quản lý</a>
             <a
               href="#gian-hang"
               onClick={() => setOpen(false)}

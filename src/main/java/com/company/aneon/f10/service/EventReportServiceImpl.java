@@ -10,6 +10,7 @@ import com.company.aneon.f10.repository.ChiPhiThucTeRepository;
 import com.company.aneon.f10.repository.LuotThamGiaSuKienRepository;
 import com.company.aneon.f10.repository.SuKienRepository;
 import com.company.aneon.shared.error.ApiException;
+import com.company.aneon.shared.security.AccessScopePort;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -25,21 +26,24 @@ public class EventReportServiceImpl implements EventReportService {
     private final SuKienRepository suKienRepository;
     private final ChiPhiThucTeRepository chiPhiRepository;
     private final LuotThamGiaSuKienRepository attendanceRepository;
+    private final AccessScopePort accessScopePort;
 
     public EventReportServiceImpl(SuKienRepository suKienRepository,
                                   ChiPhiThucTeRepository chiPhiRepository,
-                                  LuotThamGiaSuKienRepository attendanceRepository) {
+                                  LuotThamGiaSuKienRepository attendanceRepository,
+                                  AccessScopePort accessScopePort) {
         this.suKienRepository = suKienRepository;
         this.chiPhiRepository = chiPhiRepository;
         this.attendanceRepository = attendanceRepository;
+        this.accessScopePort = accessScopePort;
     }
 
     @Override
     @Transactional(readOnly = true)
     public EventDtos.EventReportResponse report(UUID eventId) {
         SuKien event = suKienRepository.findById(eventId)
-                .filter(e -> e.getArchivedAt() == null)
                 .orElseThrow(() -> ApiException.notFound("Su kien", eventId));
+        EventAccess.requireInScope(event, accessScopePort);
 
         BigDecimal totalExpense = chiPhiRepository.sumActualExpense(eventId);
         BigDecimal budgetVariance = event.getApprovedBudget() == null ? null

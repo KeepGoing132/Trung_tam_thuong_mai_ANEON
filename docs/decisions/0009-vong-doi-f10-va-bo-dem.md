@@ -14,7 +14,7 @@
 ## Vòng đời khuyến mãi
 
 - Trạng thái ban đầu khi tạo: `SCHEDULED` nếu chưa tới hạn, `ACTIVE` nếu đang trong khoảng, `FINISHED` nếu đã quá hạn. Không nhận `DANG_DIEN_RA` (D0001).
-- Áp dụng chỉ khi `ACTIVE` và trong `[startAt, endAt]`.
+- Khi áp dụng, xác định hiệu lực của chương trình `ACTIVE` hoặc `SCHEDULED` theo `[startAt, endAt]`. Chương trình đặt lịch có hiệu lực từ giờ bắt đầu mà không cần tác vụ nền cập nhật trạng thái đã lưu.
 
 ## Làm tròn và đơn vị
 

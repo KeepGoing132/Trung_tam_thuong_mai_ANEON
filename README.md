@@ -68,8 +68,8 @@ curl -X POST http://localhost:8080/api/v1/f01/premises `
 ## Kiểm thử
 
 ```powershell
-.\mvnw.cmd test      # 60 unit test (Mockito, không cần DB)
-.\mvnw.cmd verify    # + 16 IT trên MySQL thật
+.\mvnw.cmd test      # Unit test (Mockito, không cần DB)
+.\mvnw.cmd verify    # Kiểm thử tích hợp trên MySQL thật
 ```
 
 IT (`F01WebFlowIT`, `F10ConcurrencyIT`) mặc định dùng **Testcontainers MySQL 8.0**
@@ -106,25 +106,40 @@ các lần chạy — các mã dùng trong IT sinh duy nhất theo thời gian n
 
 ---
 
-## Frontend — Website AEON MALL (`frontend/`)
+## Frontend — AEON MALL và quản lý ANEON (`frontend/`)
 
-Website công khai của trung tâm thương mại (tương ứng ý tưởng cổng F12), dựng theo tinh
-thần thiết kế của godaylight.com (nền kem, display serif lớn, gradient động, editorial)
-nhưng dùng màu nhận diện AEON (magenta trên nền cream).
+| Đường dẫn | Chức năng |
+| --- | --- |
+| `/` | Trang giới thiệu, gian hàng mẫu có bộ lọc, sự kiện và ưu đãi lấy từ F10 |
+| `/kham-pha` | Khách tra cứu sự kiện và ưu đãi theo tên, danh mục và trang |
+| `/check-in` | Khách xác nhận tham gia từ liên kết có `event` và `token` do F10 tạo |
+| `/quan-ly` | Nhân viên quản lý mặt bằng, cửa hàng, trạng thái, lịch sử, khai thác (F01), sự kiện, khuyến mãi và voucher (F10) |
+
+Chạy Spring Boot theo phần trên. Để thử nghiệp vụ bằng danh tính local, mở PowerShell ở thư mục `code`:
+
+```powershell
+$env:ANEON_PUBLIC_CHECKIN_BASE_URL = 'http://localhost:3000/check-in'
+.\mvnw.cmd spring-boot:run '-Dspring-boot.run.profiles=local'
+```
+
+Trong cửa sổ PowerShell khác:
 
 ```powershell
 cd frontend
 npm install
+$env:NEXT_PUBLIC_ANEON_LOCAL_IDENTITY = 'true' # chỉ dùng khi backend chạy profile local
 npm run dev      # http://localhost:3000
-npm run build    # production build
-npm start        # chạy bản production
 ```
 
-- **Stack**: Next.js 15 (App Router) + Tailwind CSS v4 + Framer Motion; TypeScript.
-- **Sections**: Header sticky chuyển trạng thái, Hero fullscreen (zoom chậm + staggered
-  headline), Marquee, About, Store Directory (tìm kiếm + lọc danh mục/tầng hoạt động thật),
-  Mua sắm & Ẩm thực, Ưu đãi (thẻ khung gradient động), Sự kiện (lọc theo tag), Tiện ích,
-  Footer (đăng ký bản tin có trạng thái thành công).
+- Next.js chuyển tiếp `/aneon-api/*` tới Spring Boot ở `http://127.0.0.1:8080/api/v1/*`.
+  Đặt `ANEON_API_ORIGIN` trước khi chạy Next.js nếu backend dùng địa chỉ khác.
+- Ở `/quan-ly`, nhập UUID trong `tai_khoan_nguoi_dung` và chọn vai trò local. Tạo hoặc sửa
+  bản ghi cần tài khoản và các UUID tham chiếu đã có trong MySQL. Ví dụ: tạo mặt bằng cần
+  `khu_vuc.id`, đề xuất sự kiện cần `vi_tri.id`, và check-in của khách cần tài khoản có
+  `customer_id` trỏ tới `khach_mua_sam.id`.
+- Khi đã có JWT từ hệ thống định danh, giao diện gửi `Authorization: Bearer …`. Tắt
+  chế độ local ở cả hai ứng dụng khi triển khai; dự án hiện chưa tích hợp nhà cung cấp định danh.
+- Dùng `npm run build` và `npm start` để chạy bản production.
 - **Ảnh**: Unsplash (giấy phép Unsplash, đã kiểm tra nội dung từng ảnh). Prompt tạo bộ
   ảnh AI đồng bộ nằm ở `frontend/docs/image-prompts.md`.
 - **Kiểm tra**: `node scripts/screenshot.mjs` chụp desktop/mobile bằng Edge headless

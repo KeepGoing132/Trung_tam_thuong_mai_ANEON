@@ -167,6 +167,16 @@ class F01WebFlowIT extends AbstractMySqlIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.content[0].action").value("UPDATE_STATUS"))
                 .andExpect(jsonPath("$.data.content[0].newValueJson").exists());
+
+        mockMvc.perform(get("/api/v1/f01/histories")
+                        .header("X-Actor-Id", actorId).header("X-Actor-Roles", "MANAGEMENT")
+                        .header("X-Actor-Zones", chain.zoneId())
+                        .param("targetId", premiseId).param("action", "UPDATE_STATUS")
+                        .param("changedBy", actorId.toString()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.totalElements").value(1))
+                .andExpect(jsonPath("$.data.content[0].changedBy").value(actorId.toString()))
+                .andExpect(jsonPath("$.data.content[0].oldValueJson").exists());
     }
 
     @Test

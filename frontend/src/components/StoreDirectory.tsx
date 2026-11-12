@@ -30,7 +30,7 @@ export default function StoreDirectory() {
         <div className="flex flex-col gap-8 md:flex-row md:items-end md:justify-between">
           <div>
             <Reveal>
-              <Eyebrow index="02" label="Thư viện gian hàng" tone="light" />
+              <Eyebrow index="02" label="Danh sách gian hàng mẫu" tone="light" />
             </Reveal>
             <h2 className="mt-8 font-display text-4xl font-light leading-[1.08] tracking-[-0.02em] sm:text-5xl md:text-[56px]">
               <span className="block">Tìm ra cửa hàng</span>
@@ -111,7 +111,7 @@ export default function StoreDirectory() {
         {/* Kết quả */}
         <div className="mt-10 border-t border-cream/10">
           <p className="py-4 font-mono text-[11px] uppercase tracking-[0.25em] text-cream/50" role="status">
-            {results.length} gian hàng {query || category !== "Tất cả" || floor !== "Tất cả" ? "phù hợp" : "đang mở"}
+            {results.length} gian hàng {query || category !== "Tất cả" || floor !== "Tất cả" ? "phù hợp" : "mẫu"}
           </p>
           <ul className="grid gap-0 md:grid-cols-2">
             {results.map((store, i) => (
@@ -122,8 +122,7 @@ export default function StoreDirectory() {
                 transition={{ duration: 0.4, delay: Math.min(i * 0.03, 0.25), ease: EASE }}
                 className="group border-b border-cream/10 md:odd:border-r"
               >
-                <a
-                  href="#gian-hang"
+                <div
                   className="flex items-baseline gap-5 px-1 py-6 transition-colors md:px-5"
                 >
                   <span className="font-mono text-[11px] text-cream/40 transition-colors group-hover:text-magenta">
@@ -143,7 +142,7 @@ export default function StoreDirectory() {
                   <span className="hidden font-mono text-[10px] uppercase tracking-[0.2em] text-cream/40 md:block">
                     {store.category}
                   </span>
-                </a>
+                </div>
               </motion.li>
             ))}
           </ul>

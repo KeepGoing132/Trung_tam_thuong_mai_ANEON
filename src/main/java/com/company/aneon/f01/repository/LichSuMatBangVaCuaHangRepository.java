@@ -30,6 +30,7 @@ public interface LichSuMatBangVaCuaHangRepository extends JpaRepository<LichSuMa
             select h from LichSuMatBangVaCuaHang h
             left join MatBang mb on h.targetType = 'MAT_BANG' and mb.id = h.targetId
             left join CuaHangSap ch on h.targetType = 'CUA_HANG' and ch.id = h.targetId
+            left join ch.premise chPremise
             where (:targetType is null or h.targetType = :targetType)
               and (:targetId is null or h.targetId = :targetId)
               and (:action is null or h.action = :action)
@@ -37,7 +38,8 @@ public interface LichSuMatBangVaCuaHangRepository extends JpaRepository<LichSuMa
               and (:fromTime is null or h.createdAt >= :fromTime)
               and (:toTime is null or h.createdAt <= :toTime)
               and (:targetCode is null or mb.code = :targetCode or ch.code = :targetCode)
-              and (:scopeAll = true or mb.zone.id in :zoneIds or ch.premise.zone.id in :zoneIds)
+              and (:scopeAll = true or mb.zone.id in :zoneIds or chPremise.zone.id in :zoneIds)
+            order by h.createdAt desc, h.id desc
             """)
     Page<LichSuMatBangVaCuaHang> searchHistory(@Param("targetType") String targetType,
                                                @Param("targetId") UUID targetId,

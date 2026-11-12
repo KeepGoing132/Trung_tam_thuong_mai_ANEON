@@ -27,9 +27,11 @@ import com.company.aneon.shared.error.ErrorCode;
 import com.company.aneon.shared.reference.TepDinhKemLookupRepository;
 import com.company.aneon.shared.security.AccessScopePort;
 import com.company.aneon.shared.security.RolePermissions;
+import com.company.aneon.shared.web.PageResponse;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -116,6 +118,7 @@ public class EventServiceImpl implements EventService {
         event.setCode(code);
         event.setName(request.name().trim());
         event.setType(request.type());
+        event.setLocation(viTriReference(request.locationId()));
         event.setStartAt(request.startAt());
         event.setEndAt(request.endAt());
         event.setEstimatedBudget(request.estimatedBudget());
@@ -129,8 +132,7 @@ public class EventServiceImpl implements EventService {
         for (UUID storeId : storeIds) {
             suKienCuaHangRepository.save(new SuKienCuaHang(UUID.randomUUID(), event.getId(), storeId));
         }
-        return new EventDtos.EventSummary(event.getId(), event.getCode(), event.getName(),
-                event.getStatus(), event.getEstimatedBudget(), event.getProposedBy(), event.getCreatedAt());
+        return toSummary(event);
     }
 
     @Override
@@ -138,6 +140,7 @@ public class EventServiceImpl implements EventService {
     public EventDtos.EventDetail approve(UUID eventId, EventDtos.ApproveEventRequest request) {
         SuKien event = suKienRepository.findWithLockById(eventId)
                 .orElseThrow(() -> ApiException.notFound("Su kien", eventId));
+        EventAccess.requireInScope(event, accessScopePort);
         if (event.getStatus() != EventStatus.PENDING_APPROVAL) {
             throw ApiException.conflict("Chi de xuat o trang thai PENDING_APPROVAL duoc duyet/tu choi");
         }
@@ -180,6 +183,7 @@ public class EventServiceImpl implements EventService {
                                                          EventDtos.CreateActivitiesRequest request) {
         SuKien event = suKienRepository.findWithLockById(eventId)
                 .orElseThrow(() -> ApiException.notFound("Su kien", eventId));
+        EventAccess.requireInScope(event, accessScopePort);
         if (event.getStatus() != EventStatus.PENDING_APPROVAL
                 && event.getStatus() != EventStatus.APPROVED) {
             throw ApiException.conflict("Chi xep lich khi su kien dang cho duyet hoac da duyet");
@@ -245,9 +249,24 @@ public class EventServiceImpl implements EventService {
 
     @Override
     @Transactional(readOnly = true)
+    public PageResponse<EventDtos.EventSummary> search(String q, EventStatus status, int page, int size) {
+        var scope = accessScopePort.currentScope();
+        if (!scope.allZones() && scope.zoneIds().isEmpty()) {
+            return new PageResponse<>(List.of(), page, size, 0);
+        }
+        String term = q == null ? "" : q.strip().toLowerCase(java.util.Locale.ROOT);
+        String keyword = "%" + term.replace("!", "!!").replace("%", "!%").replace("_", "!_") + "%";
+        var pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt", "id"));
+        var results = suKienRepository.search(status, keyword, scope.allZones(), scope.zoneIds(), pageable);
+        return PageResponse.of(results.map(this::toSummary));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public EventDtos.EventDetail detail(UUID eventId) {
         SuKien event = suKienRepository.findWithLocationById(eventId)
                 .orElseThrow(() -> ApiException.notFound("Su kien", eventId));
+        EventAccess.requireInScope(event, accessScopePort);
         return toDetail(event);
     }
 
@@ -255,8 +274,8 @@ public class EventServiceImpl implements EventService {
     @Transactional
     public EventDtos.ExpenseCreatedResult recordExpense(UUID eventId, EventDtos.CreateExpenseRequest request) {
         SuKien event = suKienRepository.findById(eventId)
-                .filter(e -> e.getArchivedAt() == null)
                 .orElseThrow(() -> ApiException.notFound("Su kien", eventId));
+        EventAccess.requireInScope(event, accessScopePort);
         UUID actorId = requireActor();
         if (request.attachmentId() != null
                 && !tepDinhKemLookupRepository.existsById(request.attachmentId())) {
@@ -337,6 +356,11 @@ public class EventServiceImpl implements EventService {
     private UUID requireActor() {
         return accessScopePort.currentActorId().orElseThrow(
                 () -> new ApiException(ErrorCode.UNAUTHENTICATED, "Khong xac dinh duoc nguoi thao tac"));
+    }
+
+    private EventDtos.EventSummary toSummary(SuKien event) {
+        return new EventDtos.EventSummary(event.getId(), event.getCode(), event.getName(),
+                event.getStatus(), event.getEstimatedBudget(), event.getProposedBy(), event.getCreatedAt());
     }
 
     private EventDtos.EventDetail toDetail(SuKien event) {

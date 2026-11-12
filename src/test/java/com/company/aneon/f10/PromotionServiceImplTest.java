@@ -173,6 +173,26 @@ class PromotionServiceImplTest {
     }
 
     @Test
+    void khuyenMaiDatLichApDungTuDungGioBatDau() {
+        var promotion = discountPromotion(new BigDecimal("10"), null);
+        promotion.setStatus(PromotionStatus.SCHEDULED);
+        promotion.setStartAt(CLOCK.instant().plusSeconds(1));
+        var application = new PromotionDtos.ApplyPromotionRequest(invoiceId, customerId, null, "KEY-SCHEDULED");
+        assertThatThrownBy(() -> service.apply(promotionId, application))
+                .isInstanceOf(ApiException.class).hasMessageContaining("khong trong thoi gian");
+
+        promotion.setStartAt(CLOCK.instant());
+        when(invoiceLookupPort.findInvoice(invoiceId)).thenReturn(Optional.of(
+                new InvoiceLookupPort.InvoiceRef(invoiceId, customerId, UUID.randomUUID(), new BigDecimal("500000"), true)));
+        assertThat(service.apply(promotionId, application).discountAmount()).isEqualByComparingTo("50000");
+
+        promotion.setStartAt(CLOCK.instant().minusSeconds(2));
+        promotion.setEndAt(CLOCK.instant().minusSeconds(1));
+        assertThatThrownBy(() -> service.apply(promotionId, application))
+                .isInstanceOf(ApiException.class).hasMessageContaining("khong trong thoi gian");
+    }
+
+    @Test
     void applyKhongCapKhiDuoiMucToiDa() {
         discountPromotion(new BigDecimal("15"), new BigDecimal("100000"));
         when(invoiceLookupPort.findInvoice(invoiceId)).thenReturn(Optional.of(

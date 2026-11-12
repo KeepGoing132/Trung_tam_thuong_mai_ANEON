@@ -68,21 +68,27 @@ public class QrCodeServiceImpl implements QrCodeService {
     @Override
     @Transactional
     public EventDtos.QrCodeDto generate(UUID eventId) {
+        requirePermission(RolePermissions.F10_EVENT_QR);
+        SuKien event = suKienRepository.findWithLockById(eventId)
+                .orElseThrow(() -> ApiException.notFound("Su kien", eventId));
+        EventAccess.requireInScope(event, accessScopePort);
         if (publicCheckInBaseUrl == null || publicCheckInBaseUrl.isBlank()) {
             throw ApiException.dependencyUnavailable(
                     "Chua cau hinh aneon.public-checkin-base-url cho URL check-in cong khai");
         }
-        SuKien event = suKienRepository.findWithLockById(eventId)
-                .orElseThrow(() -> ApiException.notFound("Su kien", eventId));
         if (event.getStatus() != EventStatus.APPROVED && event.getStatus() != EventStatus.ONGOING) {
             throw ApiException.conflict("Chi sinh QR cho su kien da duyet va con duoc check-in");
         }
-        requirePermission(RolePermissions.F10_EVENT_QR);
+        if (event.getEndAt() == null || !Instant.now(clock).isBefore(event.getEndAt())) {
+            throw ApiException.conflict("Su kien da ket thuc, khong the sinh QR");
+        }
 
-        // Thu hoi QR cu trong cung transaction; unique(event_id, active_guard)
-        // chan hai request tao hai QR active (D0007). Request thua trong canh
-        // tranh nhan 409 (retryable) thay vi hai QR active.
-        qrRepository.findActiveWithLockByEventId(eventId).forEach(qr -> qr.setActive(false));
+        // Flush thu hoi truoc khi INSERT de khong va UNIQUE(event_id, active_guard).
+        var activeCodes = qrRepository.findActiveWithLockByEventId(eventId);
+        if (!activeCodes.isEmpty()) {
+            activeCodes.forEach(qr -> qr.setActive(false));
+            qrRepository.flush();
+        }
 
         String token = newToken();
         MaQrThamGia qr = new MaQrThamGia();
@@ -110,7 +116,7 @@ public class QrCodeServiceImpl implements QrCodeService {
             throw ApiException.validation("qrToken", "Token QR khong duoc trong");
         }
         UUID actorId = requireActor();
-        UUID customerId = resolveCustomerId(request.customerId(), actorId);
+        UUID customerId = resolveCustomerId(request.customerId(), actorId, event);
         if (!customerLookupPort.customerExists(customerId)) {
             throw ApiException.notFound("Khach mua sam", customerId);
         }
@@ -120,7 +126,7 @@ public class QrCodeServiceImpl implements QrCodeService {
             throw ApiException.conflict("Su kien khong dang nhan check-in (trang thai " + event.getStatus() + ")");
         }
         if (event.getStartAt() != null && now.isBefore(event.getStartAt())
-                || event.getEndAt() != null && now.isAfter(event.getEndAt())) {
+                || event.getEndAt() == null || !now.isBefore(event.getEndAt())) {
             throw ApiException.conflict("Check-in chi trong thoi gian su kien");
         }
 
@@ -130,7 +136,7 @@ public class QrCodeServiceImpl implements QrCodeService {
         if (!eventId.equals(qr.getEvent().getId())) {
             throw new ApiException(ErrorCode.BUSINESS_CONFLICT, "QR khong thuoc su kien nay");
         }
-        if (qr.getExpiresAt() != null && now.isAfter(qr.getExpiresAt())) {
+        if (qr.getExpiresAt() != null && !now.isBefore(qr.getExpiresAt())) {
             throw new ApiException(ErrorCode.BUSINESS_CONFLICT, "QR da het han");
         }
 
@@ -157,7 +163,7 @@ public class QrCodeServiceImpl implements QrCodeService {
     }
 
     /** Khach tu check-in cho minh; nhan vien ho tro can quyen assist + customerId (D0007). */
-    private UUID resolveCustomerId(UUID requestedCustomerId, UUID actorId) {
+    private UUID resolveCustomerId(UUID requestedCustomerId, UUID actorId, SuKien event) {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         boolean isCustomer = auth != null && auth.getAuthorities().stream()
                 .anyMatch(a -> "ROLE_CUSTOMER".equals(a.getAuthority()));
@@ -171,6 +177,7 @@ public class QrCodeServiceImpl implements QrCodeService {
                 .anyMatch(a -> new SimpleGrantedAuthority(RolePermissions.F10_CHECKIN_ASSIST)
                         .equals(a));
         if (isAssistant) {
+            EventAccess.requireInScope(event, accessScopePort);
             if (requestedCustomerId == null) {
                 throw ApiException.validation("customerId", "Nhan vien ho tro phai chi dinh khach hang");
             }

@@ -4,8 +4,7 @@ import Marquee from "@/components/Marquee";
 import About from "@/components/About";
 import StoreDirectory from "@/components/StoreDirectory";
 import ShoppingDining from "@/components/ShoppingDining";
-import Promotions from "@/components/Promotions";
-import EventsSection from "@/components/EventsSection";
+import { DiscoveryPreview } from "@/components/aneon/Discovery";
 import Facilities from "@/components/Facilities";
 import Footer from "@/components/Footer";
 
@@ -19,8 +18,8 @@ export default function Home() {
         <About />
         <StoreDirectory />
         <ShoppingDining />
-        <Promotions />
-        <EventsSection />
+        <DiscoveryPreview category="PROMOTION" id="uu-dai" />
+        <DiscoveryPreview category="EVENT" id="su-kien" />
         <Facilities />
       </main>
       <Footer />

@@ -1,5 +1,6 @@
 package com.company.aneon.f10.repository;
 
+import java.math.BigDecimal;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -15,11 +16,17 @@ public interface LanApDungKhuyenMaiRepository extends JpaRepository<LanApDungKhu
 
     Optional<LanApDungKhuyenMai> findByCustomerVoucherId(UUID customerVoucherId);
 
-    public record PromotionAggregate(long applyCount, java.math.BigDecimal totalDiscount, long totalPoints) {
+    interface PromotionAggregate {
+        long getApplyCount();
+        BigDecimal getTotalDiscount();
+        long getTotalPoints();
     }
 
     /** Tong hop lan ap dung trong mot truy van, khong JOIN nhan ban. */
-    @Query("select count(a), coalesce(sum(a.discountAmount), 0), coalesce(sum(a.pointsGranted), 0) "
-            + "from LanApDungKhuyenMai a where a.promotionId = :promotionId")
-    Object[] aggregateByPromotion(@Param("promotionId") UUID promotionId);
+    @Query("""
+            select count(a) as applyCount, coalesce(sum(a.discountAmount), 0) as totalDiscount,
+                   coalesce(sum(a.pointsGranted), 0) as totalPoints
+            from LanApDungKhuyenMai a where a.promotionId = :promotionId
+            """)
+    PromotionAggregate aggregateByPromotion(@Param("promotionId") UUID promotionId);
 }

@@ -2,9 +2,13 @@ package com.company.aneon.f10.service;
 
 import java.util.UUID;
 
+import com.company.aneon.f10.constant.EventStatus;
 import com.company.aneon.f10.dto.EventDtos;
+import com.company.aneon.shared.web.PageResponse;
 
 public interface EventService {
+
+    PageResponse<EventDtos.EventSummary> search(String q, EventStatus status, int page, int size);
 
     /** F10UC01.1: tao va gui de xuat -> PENDING_APPROVAL (D0004). */
     EventDtos.EventSummary createProposal(EventDtos.CreateEventProposalRequest request);

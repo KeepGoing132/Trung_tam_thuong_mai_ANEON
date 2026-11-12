@@ -49,17 +49,27 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.http.MediaType;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
  * Transaction/dong toi/rang buoc tren MySQL that (rule 07): voucher cuoi
  * cung, dien tich mat bang, trung code, QR active duy nhat, check-in lap,
  * trung lich sanh, idempotency ap dung khuyen mai.
  */
+@AutoConfigureMockMvc
 class F10ConcurrencyIT extends AbstractMySqlIntegrationTest {
 
     @Autowired ToaNhaRepository toaNhaRepository;
@@ -79,6 +89,7 @@ class F10ConcurrencyIT extends AbstractMySqlIntegrationTest {
     @Autowired CuaHangSapService cuaHangSapService;
     @Autowired MatBangService matBangService;
     @Autowired JdbcTemplate jdbc;
+    @Autowired MockMvc mvc;
 
     private TestSeed.SpaceChain chain;
     private final UUID actorId = UUID.randomUUID();
@@ -109,6 +120,58 @@ class F10ConcurrencyIT extends AbstractMySqlIntegrationTest {
         TestSeed.customer(jdbc, customerId, "09" + String.format("%08d",
                 Math.abs(customerId.hashCode()) % 100000000));
         return customerId;
+    }
+
+    @Test
+    void timDeXuatTheoTrangThaiVaPhamViTruocKhiPhanTrang() throws Exception {
+        login(actorId, "MARKETING");
+        var other = TestSeed.space(toaNhaRepository, tangRepository, khuVucRepository, viTriRepository);
+        String prefix = "SCOPE_" + UUID.randomUUID();
+        Instant start = Instant.now().plus(1, ChronoUnit.DAYS);
+        for (UUID location : List.of(chain.locationId(), other.locationId())) {
+            eventService.createProposal(new EventDtos.CreateEventProposalRequest(
+                    prefix + location.toString().substring(0, 4), "Sự kiện " + prefix, null, location,
+                    start, start.plus(1, ChronoUnit.HOURS), BigDecimal.TEN, 10, false, List.of(), List.of()));
+        }
+        SecurityContextHolder.clearContext();
+        var search = get("/api/v1/f10/events").param("q", prefix).param("status", "PENDING_APPROVAL")
+                .param("size", "1").header("X-Actor-Id", actorId).header("X-Actor-Roles", "MANAGEMENT");
+        mvc.perform(search).andExpect(status().isOk()).andExpect(jsonPath("$.data.totalElements").value(2));
+        mvc.perform(search.header("X-Actor-Zones", chain.zoneId())).andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.totalElements").value(1));
+        mvc.perform(get("/api/v1/f10/events")).andExpect(status().isUnauthorized());
+        mvc.perform(get("/api/v1/f10/events").header("X-Actor-Id", actorId).header("X-Actor-Roles", "CUSTOMER"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void chanCacThaoTacSuKienNgoaiKhuVuc() throws Exception {
+        var other = TestSeed.space(toaNhaRepository, tangRepository, khuVucRepository, viTriRepository);
+        SuKien event = approvedEventNow();
+        String path = "/api/v1/f10/events/" + event.getId();
+
+        mvc.perform(inZone(get(path), "MANAGEMENT", chain.zoneId())).andExpect(status().isOk());
+        mvc.perform(inZone(get(path + "/report"), "MANAGEMENT", chain.zoneId())).andExpect(status().isOk());
+        mvc.perform(inZone(get(path), "MANAGEMENT", other.zoneId())).andExpect(status().isForbidden());
+        mvc.perform(inZone(get(path + "/report"), "MANAGEMENT", other.zoneId())).andExpect(status().isForbidden());
+        mvc.perform(inZone(put(path + "/approval"), "MANAGEMENT", other.zoneId())
+                .contentType(MediaType.APPLICATION_JSON).content("{\"action\":\"APPROVE\",\"approvedBudget\":100,\"version\":0}"))
+                .andExpect(status().isForbidden());
+        mvc.perform(inZone(post(path + "/activities"), "MARKETING", other.zoneId())
+                .contentType(MediaType.APPLICATION_JSON).content("{\"activities\":[]}"))
+                .andExpect(status().isForbidden());
+        mvc.perform(inZone(post(path + "/expenses"), "MARKETING", other.zoneId())
+                .contentType(MediaType.APPLICATION_JSON).content("{\"amount\":100}"))
+                .andExpect(status().isForbidden());
+        mvc.perform(inZone(post(path + "/qr-code"), "MARKETING", other.zoneId())).andExpect(status().isForbidden());
+        mvc.perform(inZone(post(path + "/check-ins"), "OPERATIONS", other.zoneId())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"qrToken\":\"test\",\"customerId\":\"" + newCustomer() + "\"}"))
+                .andExpect(status().isForbidden());
+    }
+
+    private MockHttpServletRequestBuilder inZone(MockHttpServletRequestBuilder request, String role, UUID zoneId) {
+        return request.header("X-Actor-Id", actorId).header("X-Actor-Roles", role).header("X-Actor-Zones", zoneId);
     }
 
     record RaceResult<T>(T value, Exception error) {
@@ -236,21 +299,24 @@ class F10ConcurrencyIT extends AbstractMySqlIntegrationTest {
         long activeCount = qrRepository.findByEventIdOrderByCreatedAtDesc(event.getId()).stream()
                 .filter(MaQrThamGia::isActive).count();
         assertThat(activeCount).isEqualTo(1);
-        assertThat(results.stream().filter(RaceResult::ok).count()).isEqualTo(1);
+        assertThat(results).allMatch(RaceResult::ok);
     }
 
     @Test
     void checkInLapKhongTangLuotLanHai() {
         login(actorId, "MARKETING");
         SuKien event = approvedEventNow();
+        EventDtos.QrCodeDto oldQr = qrCodeService.generate(event.getId());
         EventDtos.QrCodeDto qr = qrCodeService.generate(event.getId());
         UUID customerId = newCustomer();
         UUID staffId = UUID.randomUUID();
         TestSeed.account(jdbc, staffId, "OPERATIONS", null);
-        String token = qr.checkInUrl().substring(qr.checkInUrl().indexOf("token=") + 6)
-                .split("&")[0];
+        String token = qrToken(qr);
 
         login(staffId, "OPERATIONS");
+        assertThatThrownBy(() -> qrCodeService.checkIn(event.getId(),
+                new EventDtos.CheckInRequest(qrToken(oldQr), customerId, null)))
+                .isInstanceOf(ApiException.class).hasMessageContaining("da bi thu hoi");
         EventDtos.CheckInResult first = qrCodeService.checkIn(event.getId(),
                 new EventDtos.CheckInRequest(token, customerId, null));
         EventDtos.CheckInResult second = qrCodeService.checkIn(event.getId(),
@@ -258,6 +324,10 @@ class F10ConcurrencyIT extends AbstractMySqlIntegrationTest {
         assertThat(first.duplicate()).isFalse();
         assertThat(second.duplicate()).isTrue();
         assertThat(attendanceRepository.countByEventId(event.getId())).isEqualTo(1);
+    }
+
+    private static String qrToken(EventDtos.QrCodeDto qr) {
+        return qr.checkInUrl().substring(qr.checkInUrl().indexOf("token=") + 6).split("&")[0];
     }
 
     @Test
@@ -320,6 +390,9 @@ class F10ConcurrencyIT extends AbstractMySqlIntegrationTest {
         assertThat(first.duplicate()).isFalse();
         assertThat(second.duplicate()).isTrue();
         assertThat(second.applicationId()).isEqualTo(first.applicationId());
+        var realtime = promotionService.realtime(promotion.id());
+        assertThat(realtime.usedCount()).isEqualTo(1);
+        assertThat(realtime.totalDiscountGranted()).isEqualByComparingTo("50000");
     }
 
     private SuKien approvedEventNow() {
@@ -327,6 +400,7 @@ class F10ConcurrencyIT extends AbstractMySqlIntegrationTest {
         event.setId(UUID.randomUUID());
         event.setCode("EVIT" + System.nanoTime() % 100000000L);
         event.setName("Su kien IT");
+        event.setLocation(viTriRepository.findById(chain.locationId()).orElseThrow());
         event.setStatus(EventStatus.APPROVED);
         event.setStartAt(Instant.now().minus(2, ChronoUnit.HOURS));
         event.setEndAt(Instant.now().plus(2, ChronoUnit.HOURS));

@@ -20,6 +20,8 @@ import com.company.aneon.f10.repository.ChiPhiThucTeRepository;
 import com.company.aneon.f10.repository.LuotThamGiaSuKienRepository;
 import com.company.aneon.f10.repository.SuKienRepository;
 import com.company.aneon.f10.service.EventReportServiceImpl;
+import com.company.aneon.shared.security.AccessScope;
+import com.company.aneon.shared.security.AccessScopePort;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
@@ -38,7 +40,9 @@ class EventReportServiceImplTest {
         suKienRepository = mock(SuKienRepository.class);
         chiPhiRepository = mock(ChiPhiThucTeRepository.class);
         attendanceRepository = mock(LuotThamGiaSuKienRepository.class);
-        service = new EventReportServiceImpl(suKienRepository, chiPhiRepository, attendanceRepository);
+        AccessScopePort accessScopePort = mock(AccessScopePort.class);
+        when(accessScopePort.currentScope()).thenReturn(AccessScope.ALL);
+        service = new EventReportServiceImpl(suKienRepository, chiPhiRepository, attendanceRepository, accessScopePort);
     }
 
     private SuKien event(Integer targetAttendees, BigDecimal approvedBudget) {
