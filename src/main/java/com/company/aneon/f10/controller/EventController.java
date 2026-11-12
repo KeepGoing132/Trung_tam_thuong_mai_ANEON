@@ -1,5 +1,6 @@
 package com.company.aneon.f10.controller;
 
+import java.util.List;
 import java.util.UUID;
 
 import com.company.aneon.f10.constant.EventStatus;
@@ -13,6 +14,7 @@ import com.company.aneon.shared.web.PageResponse;
 
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -52,6 +54,26 @@ public class EventController {
                         eventService.createProposal(request)));
     }
 
+    @PostMapping("/drafts")
+    @PreAuthorize("hasAuthority('" + RolePermissions.F10_EVENT_PROPOSE + "')")
+    public ResponseEntity<ApiResponse<EventDtos.EventSummary>> createDraft(
+            @Valid @RequestBody EventDtos.CreateEventProposalRequest request) {
+        return ResponseEntity.status(201).body(ApiResponse.created("Da luu ban nhap", eventService.createDraft(request)));
+    }
+
+    @PutMapping("/{id}/draft")
+    @PreAuthorize("hasAuthority('" + RolePermissions.F10_EVENT_PROPOSE + "')")
+    public ApiResponse<EventDtos.EventDetail> updateDraft(@PathVariable UUID id, @RequestParam long version,
+            @Valid @RequestBody EventDtos.CreateEventProposalRequest request) {
+        return ApiResponse.ok("Da luu ban nhap", eventService.updateDraft(id, version, request));
+    }
+
+    @PostMapping("/{id}/submission")
+    @PreAuthorize("hasAuthority('" + RolePermissions.F10_EVENT_PROPOSE + "')")
+    public ApiResponse<EventDtos.EventDetail> submitDraft(@PathVariable UUID id, @RequestParam long version) {
+        return ApiResponse.ok("Da gui de xuat", eventService.submitDraft(id, version));
+    }
+
     @PutMapping("/{id}/approval")
     @PreAuthorize("hasAuthority('" + RolePermissions.F10_EVENT_APPROVE + "')")
     public ApiResponse<EventDtos.EventDetail> approve(
@@ -68,6 +90,25 @@ public class EventController {
         return ResponseEntity.status(201)
                 .body(ApiResponse.created("Xep lich hoat dong thanh cong",
                         eventService.addActivities(id, request)));
+    }
+
+    @GetMapping("/{id}/activities")
+    @PreAuthorize("hasAuthority('" + RolePermissions.F10_EVENT_READ + "')")
+    public ApiResponse<List<EventDtos.ActivityItem>> activities(@PathVariable UUID id) {
+        return ApiResponse.ok("Lay lich hoat dong thanh cong", eventService.activities(id));
+    }
+
+    @PutMapping("/{id}/activities/{activityId}")
+    @PreAuthorize("hasAuthority('" + RolePermissions.F10_EVENT_SCHEDULE + "')")
+    public ApiResponse<EventDtos.ActivityItem> updateActivity(@PathVariable UUID id, @PathVariable UUID activityId,
+            @RequestParam long version, @Valid @RequestBody EventDtos.CreateActivityRequest request) {
+        return ApiResponse.ok("Da cap nhat hoat dong", eventService.updateActivity(id, activityId, version, request));
+    }
+
+    @DeleteMapping("/{id}/activities/{activityId}")
+    @PreAuthorize("hasAuthority('" + RolePermissions.F10_EVENT_SCHEDULE + "')")
+    public ApiResponse<UUID> archiveActivity(@PathVariable UUID id, @PathVariable UUID activityId, @RequestParam long version) {
+        return ApiResponse.ok("Da go hoat dong khoi lich", eventService.archiveActivity(id, activityId, version));
     }
 
     @PostMapping("/{id}/qr-code")

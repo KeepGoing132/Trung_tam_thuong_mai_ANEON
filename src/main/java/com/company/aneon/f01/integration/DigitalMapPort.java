@@ -1,5 +1,8 @@
 package com.company.aneon.f01.integration;
 
+import java.math.BigDecimal;
+import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 /**
@@ -8,8 +11,15 @@ import java.util.UUID;
  */
 public interface DigitalMapPort {
 
+    record MapPoint(UUID id, BigDecimal x, BigDecimal y, String label) { }
+
+    record FloorMap(UUID id, String name, BigDecimal minX, BigDecimal minY,
+                    BigDecimal maxX, BigDecimal maxY, List<MapPoint> points) { }
+
     /** false khi khong the xac minh ban do -> 503 DEPENDENCY_UNAVAILABLE. */
     boolean isAvailable();
 
     boolean isLocationMappable(UUID locationId);
+
+    Optional<FloorMap> findForZone(UUID zoneId);
 }

@@ -94,11 +94,32 @@ public class EventServiceImpl implements EventService {
     @Override
     @Transactional
     public EventDtos.EventSummary createProposal(EventDtos.CreateEventProposalRequest request) {
+        return createEvent(request, EventStatus.PENDING_APPROVAL);
+    }
+
+    @Override
+    @Transactional
+    public EventDtos.EventSummary createDraft(EventDtos.CreateEventProposalRequest request) {
+        return createEvent(request, EventStatus.DRAFT);
+    }
+
+    private EventDtos.EventSummary createEvent(EventDtos.CreateEventProposalRequest request, EventStatus status) {
         String code = request.code().trim();
         if (suKienRepository.existsByCodeIgnoreCase(code)) {
             throw new ApiException(ErrorCode.BUSINESS_CONFLICT, "Ma su kien da ton tai: " + code);
         }
         UUID actorId = requireActor();
+        SuKien event = new SuKien();
+        event.setId(UUID.randomUUID());
+        event.setCode(code);
+        event.setStatus(status);
+        event.setProposedBy(actorId);
+        event.setCreatedBy(actorId);
+        saveEventDetails(event, request, actorId);
+        return toSummary(event);
+    }
+
+    private void saveEventDetails(SuKien event, EventDtos.CreateEventProposalRequest request, UUID actorId) {
         if (!request.startAt().isBefore(request.endAt())) {
             throw ApiException.validation("endAt", "Thoi gian ket thuc phai sau thoi gian bat dau");
         }
@@ -113,9 +134,6 @@ public class EventServiceImpl implements EventService {
 
         validateProposalFiles(request.proposalFileKeys(), actorId);
 
-        SuKien event = new SuKien();
-        event.setId(UUID.randomUUID());
-        event.setCode(code);
         event.setName(request.name().trim());
         event.setType(request.type());
         event.setLocation(viTriReference(request.locationId()));
@@ -123,16 +141,47 @@ public class EventServiceImpl implements EventService {
         event.setEndAt(request.endAt());
         event.setEstimatedBudget(request.estimatedBudget());
         event.setTargetAttendees(request.targetAttendees());
-        event.setStatus(EventStatus.PENDING_APPROVAL);
-        event.setProposedBy(actorId);
         event.setPublicVisible(Boolean.TRUE.equals(request.publicVisible()));
-        event.setCreatedBy(actorId);
         suKienRepository.save(event);
 
-        for (UUID storeId : storeIds) {
+        var existing = suKienCuaHangRepository.findByEventId(event.getId());
+        var existingIds = existing.stream().map(SuKienCuaHang::getStoreId).collect(java.util.stream.Collectors.toSet());
+        suKienCuaHangRepository.deleteAll(existing.stream().filter(link -> !storeIds.contains(link.getStoreId())).toList());
+        for (UUID storeId : storeIds.stream().filter(id -> !existingIds.contains(id)).toList()) {
             suKienCuaHangRepository.save(new SuKienCuaHang(UUID.randomUUID(), event.getId(), storeId));
         }
-        return toSummary(event);
+    }
+
+    @Override
+    @Transactional
+    public EventDtos.EventDetail updateDraft(UUID id, long version, EventDtos.CreateEventProposalRequest request) {
+        UUID actorId = requireActor();
+        SuKien event = requireOwnDraft(id, version, actorId);
+        if (!event.getCode().equals(request.code().strip())) {
+            throw ApiException.validation("code", "Ma su kien khong thay doi sau khi tao");
+        }
+        entityManager.lock(event, jakarta.persistence.LockModeType.PESSIMISTIC_FORCE_INCREMENT);
+        saveEventDetails(event, request, actorId);
+        suKienRepository.flush();
+        return toDetail(event);
+    }
+
+    @Override
+    @Transactional
+    public EventDtos.EventDetail submitDraft(UUID id, long version) {
+        SuKien event = requireOwnDraft(id, version, requireActor());
+        event.setStatus(EventStatus.PENDING_APPROVAL);
+        suKienRepository.flush();
+        return toDetail(event);
+    }
+
+    private SuKien requireOwnDraft(UUID id, long version, UUID actorId) {
+        SuKien event = suKienRepository.findWithLockById(id).orElseThrow(() -> ApiException.notFound("Su kien", id));
+        EventAccess.requireInScope(event, accessScopePort);
+        if (!actorId.equals(event.getProposedBy())) throw ApiException.forbidden("Chi nguoi lap duoc sua va gui ban nhap");
+        if (event.getStatus() != EventStatus.DRAFT) throw ApiException.conflict("Su kien khong con la ban nhap");
+        if (version != event.getVersion()) throw ApiException.conflict("Phien ban du lieu da thay doi");
+        return event;
     }
 
     @Override
@@ -184,10 +233,7 @@ public class EventServiceImpl implements EventService {
         SuKien event = suKienRepository.findWithLockById(eventId)
                 .orElseThrow(() -> ApiException.notFound("Su kien", eventId));
         EventAccess.requireInScope(event, accessScopePort);
-        if (event.getStatus() != EventStatus.PENDING_APPROVAL
-                && event.getStatus() != EventStatus.APPROVED) {
-            throw ApiException.conflict("Chi xep lich khi su kien dang cho duyet hoac da duyet");
-        }
+        requireScheduleStatus(event);
         List<EventDtos.CreateActivityRequest> items = request.activities();
         if (items == null || items.isEmpty()) {
             throw ApiException.validation("activities", "Danh sach hoat dong rong");
@@ -197,23 +243,10 @@ public class EventServiceImpl implements EventService {
         List<HoatDongSuKien> created = new ArrayList<>();
         Set<UUID> lockedLocations = new LinkedHashSet<>();
         for (EventDtos.CreateActivityRequest item : items) {
-            if (!item.startAt().isBefore(item.endAt())) {
-                throw ApiException.validation("activities", "Khung gio hoat dong khong hop le");
-            }
-            if (item.startAt().isBefore(event.getStartAt()) || item.endAt().isAfter(event.getEndAt())) {
-                throw ApiException.validation("activities",
-                        "Hoat dong phai nam trong thoi gian su kien (" + event.getStartAt() + ".." + event.getEndAt() + ")");
-            }
-            if (item.personInCharge() != null && !personLookupPort.accountExists(item.personInCharge())) {
-                throw ApiException.validation("personInCharge", "Nguoi phu trach khong ton tai");
-            }
+            validateActivity(event, item);
             // Khoa vi tri dung chung mot lan per location truoc khi kiem tra/luu
             if (lockedLocations.add(item.locationId())) {
-                if (!f01LookupPort.lockLocation(item.locationId())) {
-                    throw ApiException.notFound("Vi tri", item.locationId());
-                }
-                assertLocationUsable(f01LookupPort.findLocation(item.locationId()).orElseThrow(),
-                        item.locationId());
+                lockScheduleLocation(item.locationId());
             }
             // Trung trong batch
             for (HoatDongSuKien existing : created) {
@@ -223,28 +256,105 @@ public class EventServiceImpl implements EventService {
                 }
             }
             // Trung voi cac su kien khac dang giu cho sanh
-            List<HoatDongSuKien> conflicts = hoatDongRepository.findConflicts(
-                    item.locationId(), item.startAt(), item.endAt(), OCCUPYING_STATUSES);
-            if (!conflicts.isEmpty()) {
-                HoatDongSuKien first = conflicts.get(0);
-                throw conflictSchedule(item.name(), first.getStartAt(), first.getEndAt());
-            }
+            assertScheduleFree(item, null);
 
             HoatDongSuKien activity = new HoatDongSuKien();
             activity.setId(UUID.randomUUID());
-            activity.setName(item.name().trim());
-            activity.setStartAt(item.startAt());
-            activity.setEndAt(item.endAt());
-            activity.setPersonInCharge(item.personInCharge());
-            activity.setDescription(item.description());
+            fillActivity(activity, item);
             activity.setEvent(event);
             activity.setCreatedBy(actorId);
-            ViTri locationRef = viTriReference(item.locationId());
-            activity.setLocation(locationRef);
             hoatDongRepository.save(activity);
             created.add(activity);
         }
         return new EventDtos.ActivityCreatedResult(eventId, created.size());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<EventDtos.ActivityItem> activities(UUID eventId) {
+        SuKien event = suKienRepository.findById(eventId).orElseThrow(() -> ApiException.notFound("Su kien", eventId));
+        EventAccess.requireInScope(event, accessScopePort);
+        return hoatDongRepository.findByEventIdAndArchivedAtIsNullOrderByStartAtAsc(eventId).stream()
+                .filter(activity -> accessScopePort.currentScope().allowsZone(activity.getLocation() == null
+                        ? null : activity.getLocation().getZone().getId())).map(this::toActivity).toList();
+    }
+
+    @Override
+    @Transactional
+    public EventDtos.ActivityItem updateActivity(UUID eventId, UUID activityId, long version, EventDtos.CreateActivityRequest request) {
+        HoatDongSuKien activity = requireEditableActivity(eventId, activityId, version);
+        validateActivity(activity.getEvent(), request);
+        lockScheduleLocation(request.locationId());
+        assertScheduleFree(request, activityId);
+        fillActivity(activity, request);
+        hoatDongRepository.flush();
+        return toActivity(activity);
+    }
+
+    @Override
+    @Transactional
+    public UUID archiveActivity(UUID eventId, UUID activityId, long version) {
+        HoatDongSuKien activity = requireEditableActivity(eventId, activityId, version);
+        activity.setArchivedAt(java.time.Instant.now(clock));
+        return activityId;
+    }
+
+    private HoatDongSuKien requireEditableActivity(UUID eventId, UUID activityId, long version) {
+        SuKien event = suKienRepository.findWithLockById(eventId).orElseThrow(() -> ApiException.notFound("Su kien", eventId));
+        EventAccess.requireInScope(event, accessScopePort);
+        requireScheduleStatus(event);
+        var activity = hoatDongRepository.findById(activityId)
+                .filter(item -> item.getArchivedAt() == null && eventId.equals(item.getEvent().getId()))
+                .orElseThrow(() -> ApiException.notFound("Hoat dong", activityId));
+        if (!accessScopePort.currentScope().allowsZone(activity.getLocation() == null ? null : activity.getLocation().getZone().getId())) {
+            throw ApiException.forbidden("Hoat dong nam ngoai pham vi duoc cap quyen");
+        }
+        if (activity.getVersion() != version) throw ApiException.conflict("Phien ban hoat dong da thay doi");
+        return activity;
+    }
+
+    private void requireScheduleStatus(SuKien event) {
+        if (event.getStatus() != EventStatus.PENDING_APPROVAL && event.getStatus() != EventStatus.APPROVED) {
+            throw ApiException.conflict("Chi xep lich khi su kien dang cho duyet hoac da duyet");
+        }
+    }
+
+    private void validateActivity(SuKien event, EventDtos.CreateActivityRequest item) {
+        if (!item.startAt().isBefore(item.endAt())) {
+            throw ApiException.validation("activities", "Khung gio hoat dong khong hop le");
+        }
+        if (item.startAt().isBefore(event.getStartAt()) || item.endAt().isAfter(event.getEndAt())) {
+            throw ApiException.validation("activities", "Hoat dong phai nam trong thoi gian su kien");
+        }
+        if (item.personInCharge() != null && !personLookupPort.accountExists(item.personInCharge())) {
+            throw ApiException.validation("personInCharge", "Nguoi phu trach khong ton tai");
+        }
+    }
+
+    private void lockScheduleLocation(UUID id) {
+        if (!f01LookupPort.lockLocation(id)) throw ApiException.notFound("Vi tri", id);
+        assertLocationUsable(f01LookupPort.findLocation(id).orElseThrow(() -> ApiException.notFound("Vi tri", id)), id);
+    }
+
+    private void assertScheduleFree(EventDtos.CreateActivityRequest item, UUID excludedId) {
+        hoatDongRepository.findConflicts(item.locationId(), item.startAt(), item.endAt(), OCCUPYING_STATUSES).stream()
+                .filter(conflict -> excludedId == null || !excludedId.equals(conflict.getId())).findFirst()
+                .ifPresent(conflict -> { throw conflictSchedule(item.name(), conflict.getStartAt(), conflict.getEndAt()); });
+    }
+
+    private void fillActivity(HoatDongSuKien activity, EventDtos.CreateActivityRequest item) {
+        activity.setName(item.name().trim());
+        activity.setStartAt(item.startAt());
+        activity.setEndAt(item.endAt());
+        activity.setPersonInCharge(item.personInCharge());
+        activity.setDescription(item.description());
+        activity.setLocation(viTriReference(item.locationId()));
+    }
+
+    private EventDtos.ActivityItem toActivity(HoatDongSuKien activity) {
+        return new EventDtos.ActivityItem(activity.getId(), activity.getName(), activity.getStartAt(), activity.getEndAt(),
+                activity.getLocation() == null ? null : activity.getLocation().getId(), activity.getPersonInCharge(),
+                activity.getDescription(), activity.getVersion());
     }
 
     @Override

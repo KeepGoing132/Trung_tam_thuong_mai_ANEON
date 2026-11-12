@@ -264,6 +264,8 @@ class PromotionServiceImplTest {
         voucher.setCode("VC100");
         voucher.setDiscountType(VoucherDiscountType.FIXED_AMOUNT);
         voucher.setValue(new BigDecimal("100000"));
+        voucher.setActive(true);
+        giveaway.setVoucher(voucher);
         PhieuUuDaiKhachHang instance = new PhieuUuDaiKhachHang();
         instance.setId(UUID.randomUUID());
         instance.setVoucher(voucher);

@@ -20,9 +20,9 @@ src/main/java/com/company/aneon/
   shared/            # envelope ApiResponse, lỗi chuẩn, security/scope, entity audit, reference
   f01/               # Quản lý mặt bằng: 8 entity, 5 service, 5 controller, 18 UC
   f10/               # Sự kiện & khuyến mãi: 15 bảng, 6 service, controller, 9 UC + bổ sung
-src/main/resources/db/migration/   # V1 baseline (28 bảng) + V2 ràng buộc bổ sung
+src/main/resources/db/migration/   # V1 baseline, V2 ràng buộc, V3 bảng tham chiếu, V4 nội dung tệp
 src/test/java/com/company/aneon/   # unit test + IT (Testcontainers hoặc MySQL ngoài)
-docs/decisions/      # 9 quyết định thiết kế (D0001–D0009)
+docs/decisions/      # Quyết định thiết kế (D0001–D0010)
 docs/openapi/        # Hợp đồng OpenAPI F01/F10
 ```
 
@@ -36,7 +36,7 @@ CREATE USER 'aneon'@'localhost' IDENTIFIED BY 'aneon';
 GRANT ALL PRIVILEGES ON qldapm_aneon.* TO 'aneon'@'localhost';
 ```
 
-2. Chạy app (Flyway tự tạo 28 bảng F01/F10 + bảng dùng chung lần đầu):
+2. Chạy app để Flyway tự áp dụng các migration:
 
 ```powershell
 .\mvnw.cmd spring-boot:run
@@ -96,13 +96,14 @@ các lần chạy — các mã dùng trong IT sinh duy nhất theo thời gian n
   phát/dùng voucher, áp dụng khuyến mãi).
 - Các quyết định lệch tài liệu được ghi tại `docs/decisions/` (enum D0001, baseline CSDL
   D0002, hợp đồng API D0003/D0004, ma trận trạng thái D0005, không dùng Redis D0006,
-  QR/check-in D0007, danh tính D0008, vòng đời F10 D0009).
+  QR/check-in D0007, danh tính D0008, vòng đời F10 D0009, dữ liệu tham chiếu và luồng bổ sung D0010).
 
 ## Chưa triển khai (ngoài phạm vi giao)
 
-- JWT thật + ma trận quyền F16 (hiện dùng mapping đề xuất trong D0008), upload tệp thật
-  (chỉ kiểm tra metadata), tích hợp F02/F03/F11/F15/F18 thật (chạy qua port + stub local
-  có nhãn), Redis/cache, thông báo F15 thật.
+- Nhà cung cấp danh tính và ma trận quyền F16 chính thức, ứng dụng quản lý độc lập của
+  F02/F03/F11/F18, thông báo F15, doanh thu quy thuộc để tính ROI và Redis/cache.
+- F01 đọc hợp đồng, khách thuê và sơ đồ đã phát hành từ MySQL. F10 đối chiếu hóa đơn,
+  gian hàng, hạng thành viên và lưu nội dung tệp đề xuất trong MySQL.
 
 ---
 
@@ -140,6 +141,12 @@ npm run dev      # http://localhost:3000
 - Khi đã có JWT từ hệ thống định danh, giao diện gửi `Authorization: Bearer …`. Tắt
   chế độ local ở cả hai ứng dụng khi triển khai; dự án hiện chưa tích hợp nhà cung cấp định danh.
 - Dùng `npm run build` và `npm start` để chạy bản production.
+- Nạp dữ liệu demo sau khi Flyway chạy xong bằng lệnh `SOURCE E:/duong-dan-den-code/scripts/seed-local.sql;`
+  trong MySQL client đã chọn database demo. Script bổ sung bản ghi mẫu còn thiếu và giữ bản ghi đã tồn tại.
+  Tài khoản Ban quản lý là `11111111-1111-1111-1111-111111111111`, Marketing là
+  `22222222-2222-2222-2222-222222222222`, khách là `33333333-3333-3333-3333-333333333333`.
+  Hợp đồng mẫu có UUID `a0000000-0000-4000-8000-000000000007` và hóa đơn mẫu có UUID
+  `a0000000-0000-4000-8000-000000000020`.
 - **Ảnh**: Unsplash (giấy phép Unsplash, đã kiểm tra nội dung từng ảnh). Prompt tạo bộ
   ảnh AI đồng bộ nằm ở `frontend/docs/image-prompts.md`.
 - **Kiểm tra**: `node scripts/screenshot.mjs` chụp desktop/mobile bằng Edge headless

@@ -7,6 +7,7 @@ import java.util.UUID;
 
 import com.company.aneon.f10.constant.EventStatus;
 
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
@@ -54,8 +55,11 @@ public final class EventDtos {
             @Size(max = 1000) String description) {
     }
 
-    public record CreateActivitiesRequest(@NotNull List<CreateActivityRequest> activities) {
+    public record CreateActivitiesRequest(@NotNull List<@NotNull @Valid CreateActivityRequest> activities) {
     }
+
+    public record ActivityItem(UUID id, String name, Instant startAt, Instant endAt, UUID locationId,
+                               UUID personInCharge, String description, long version) { }
 
     public record CreateExpenseRequest(
             @Size(max = 200) String supplierName,

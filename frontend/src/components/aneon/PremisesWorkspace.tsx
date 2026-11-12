@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { formatDate, query, request, type Identity } from "@/lib/aneon-api";
 import { ErrorMessage, panel, secondary } from "./Ui";
+import { PremiseMap } from "./PremiseMap";
 import { Action, allowed, Control, Details, MutationForm, Records, useResource, type Column, type FormField, type Row } from "./WorkspaceUi";
 
 const statuses: Record<string, string> = {
@@ -64,6 +65,7 @@ export function PremisesWorkspace({ view, identity }: { view: PremisesView; iden
   const columns = isStore ? storeColumns : premiseColumns;
   const detailPath = selected ? `${path}/${selected}` : undefined;
   const detail = useResource<Row>(detailPath, identity, revision);
+  const tenants = useResource<{ id: string; code: string; name: string }[]>(isStore && detailPath ? `${detailPath}/tenants` : undefined, identity, revision);
   const canWrite = allowed(identity, "MANAGEMENT");
   const canChangeStatus = isStore ? canWrite : allowed(identity, "MANAGEMENT", "OPERATIONS");
 
@@ -111,6 +113,13 @@ export function PremisesWorkspace({ view, identity }: { view: PremisesView; iden
       {detail.data && <>
         <Details data={detail.data} columns={[["id", "UUID"], ...columns, ["locationId", "UUID vị trí"], ["description", "Mô tả"],
           ...(isStore ? [["operatingHours", "Giờ hoạt động"], ["publicVisible", "Công khai"]] as Column[] : [["allocatedArea", "Đã phân bổ (m²)"]] as Column[])]} />
+        {isStore && <div className="grid gap-2 text-sm">
+          <h4 className="font-semibold">Khách thuê hiện tại</h4>
+          {tenants.loading && <p role="status">Đang tải khách thuê…</p>}
+          {tenants.error && <ErrorMessage message={tenants.error} />}
+          {tenants.data?.length === 0 && <p className="text-ink-soft">Chưa có khách thuê đang liên kết.</p>}
+          {tenants.data && tenants.data.length > 0 && <ul>{tenants.data.map((tenant) => <li key={tenant.id}>{tenant.name} ({tenant.code})</li>)}</ul>}
+        </div>}
         <div className="flex flex-wrap gap-3"><button className={secondary} onClick={() => setRevision((value) => value + 1)}>Tải lại chi tiết</button></div>
         {canWrite && <Action title="Chỉnh sửa thông tin">
           <MutationForm key={`${detailPath}-${revision}`} path={detailPath} method="PUT" identity={identity} label="Lưu chỉnh sửa"
@@ -122,8 +131,7 @@ export function PremisesWorkspace({ view, identity }: { view: PremisesView; iden
             build={(body) => ({ ...body, version: detail.data?.version })} onSaved={saved} />
         </Action>}
         {canWrite && !isStore && <Action title="Gắn vị trí mặt bằng">
-          <MutationForm path={`${detailPath}/location`} method="PUT" identity={identity} label="Lưu vị trí"
-            fields={[{ ...location, required: true }, reason]} defaults={detail.data} onSaved={saved} />
+          <PremiseMap key={detailPath} path={detailPath} identity={identity} currentId={detail.data.locationId} onSaved={saved} />
         </Action>}
         {canChangeStatus && !isStore && <Action title="Đồng bộ trạng thái theo hợp đồng">
           <MutationForm path={`${detailPath}/sync-contract-status`} identity={identity} label="Đồng bộ hợp đồng"

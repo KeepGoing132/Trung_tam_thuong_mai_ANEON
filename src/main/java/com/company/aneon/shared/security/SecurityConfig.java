@@ -60,7 +60,7 @@ public class SecurityConfig {
                                     "{\"code\":403,\"message\":\"Khong co quyen truy cap\",\"errorCode\":\"ACCESS_DENIED\"}");
                         }))
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("GET", "/api/v1/f10/promotions-events/search").permitAll()
+                        .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/f10/promotions-events/search").permitAll()
                         .requestMatchers("/actuator/health", "/actuator/info").permitAll()
                         .requestMatchers("/api/**").authenticated()
                         .anyRequest().permitAll());

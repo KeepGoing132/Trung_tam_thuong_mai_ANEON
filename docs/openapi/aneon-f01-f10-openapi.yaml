@@ -4,7 +4,7 @@ info:
   version: 0.1.0
   description: >
     Hợp đồng API baseline lấy từ TK-F01 mục 5 và TK-F10 mục 5 (bảng tổng hợp).
-    Endpoint đánh dấu [Supplemental] là bổ sung được chốt trong docs/decisions/0004.
+    Các endpoint bổ sung được ghi trong docs/decisions/0004 và docs/decisions/0010.
     Thời điểm ISO-8601 UTC; UUID chuẩn; tiền/diện tích là số thập phân;
     tỷ lệ giảm giá theo thang 0..100.
 servers:
@@ -20,6 +20,26 @@ tags:
   - name: F10 Vouchers
   - name: F10 Public
 paths:
+  /api/v1/f01/premises/{id}/map:
+    get:
+      tags: [F01 Premises]
+      summary: Đọc biên sơ đồ đã phát hành và các điểm trong khu vực mặt bằng
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: '#/components/parameters/id' }]
+      responses:
+        '200': { description: Sơ đồ và danh sách điểm }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+  /api/v1/f01/stores/{id}/tenants:
+    get:
+      tags: [F01 Stores]
+      summary: Tra cứu khách thuê đang liên kết với cửa hàng
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: '#/components/parameters/id' }]
+      responses:
+        '200': { description: 'Danh sách khách thuê gồm UUID, mã và tên' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
   /api/v1/f01/premises:
     get:
       tags: [F01 Premises]
@@ -338,6 +358,94 @@ paths:
         '400': { $ref: '#/components/responses/Error' }
         '401': { $ref: '#/components/responses/Error' }
         '403': { $ref: '#/components/responses/Error' }
+  /api/v1/f10/events/drafts:
+    post:
+      tags: [F10 Events]
+      summary: Lưu bản nháp đề xuất
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateEventProposalRequest' }
+      responses:
+        '201': { description: Bản nháp mới }
+        '400': { $ref: '#/components/responses/Error' }
+  /api/v1/f10/events/{id}/draft:
+    put:
+      tags: [F10 Events]
+      summary: Người lập cập nhật bản nháp hiện hành
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: '#/components/parameters/id' }, { $ref: '#/components/parameters/versionQuery' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateEventProposalRequest' }
+      responses:
+        '200': { description: Bản nháp đã cập nhật }
+        '403': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+  /api/v1/f10/events/{id}/submission:
+    post:
+      tags: [F10 Events]
+      summary: Gửi bản nháp sang trạng thái chờ duyệt
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: '#/components/parameters/id' }, { $ref: '#/components/parameters/versionQuery' }]
+      responses:
+        '200': { description: Đề xuất chờ duyệt }
+        '403': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+  /api/v1/f10/events/{eventId}/files:
+    parameters:
+      - { name: eventId, in: path, required: true, schema: { $ref: '#/components/schemas/UUID' } }
+    get:
+      tags: [F10 Events]
+      summary: Danh sách tệp của sự kiện
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': { description: 'Danh sách tệp gồm UUID, tên và dung lượng' }
+        '403': { $ref: '#/components/responses/Error' }
+    post:
+      tags: [F10 Events]
+      summary: Tải tệp lên bản nháp của người lập
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file: { type: string, format: binary }
+      responses:
+        '201': { description: Tệp đã lưu }
+        '400': { $ref: '#/components/responses/Error' }
+        '413': { $ref: '#/components/responses/Error' }
+  /api/v1/f10/events/{eventId}/files/{fileId}:
+    parameters:
+      - { name: eventId, in: path, required: true, schema: { $ref: '#/components/schemas/UUID' } }
+      - { name: fileId, in: path, required: true, schema: { $ref: '#/components/schemas/UUID' } }
+    get:
+      tags: [F10 Events]
+      summary: Tải xuống tệp đã lưu
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Nội dung tệp
+          content:
+            application/octet-stream:
+              schema: { type: string, format: binary }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+    delete:
+      tags: [F10 Events]
+      summary: Gỡ tệp khỏi bản nháp của người lập
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': { description: UUID tệp đã gỡ }
+        '403': { $ref: '#/components/responses/Error' }
   /api/v1/f10/events/proposals:
     post:
       tags: [F10 Events]
@@ -389,6 +497,14 @@ paths:
         '404': { $ref: '#/components/responses/Error' }
         '409': { $ref: '#/components/responses/Error' }
   /api/v1/f10/events/{id}/activities:
+    get:
+      tags: [F10 Events]
+      summary: Đọc lịch hoạt động trong phạm vi được cấp quyền
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: '#/components/parameters/id' }]
+      responses:
+        '200': { description: Danh sách hoạt động theo thời gian }
+        '403': { $ref: '#/components/responses/Error' }
     post:
       tags: [F10 Events]
       summary: Xếp lịch hoạt động, chống trùng vị trí/khung giờ (F10UC01.2)
@@ -410,6 +526,30 @@ paths:
         '201': { $ref: '#/components/responses/Error' }
         '400': { $ref: '#/components/responses/Error' }
         '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+  /api/v1/f10/events/{id}/activities/{activityId}:
+    parameters:
+      - { $ref: '#/components/parameters/id' }
+      - { name: activityId, in: path, required: true, schema: { $ref: '#/components/schemas/UUID' } }
+      - { $ref: '#/components/parameters/versionQuery' }
+    put:
+      tags: [F10 Events]
+      summary: Sửa hoạt động và kiểm tra xung đột lịch
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateActivityRequest' }
+      responses:
+        '200': { description: Hoạt động đã cập nhật }
+        '409': { $ref: '#/components/responses/Error' }
+    delete:
+      tags: [F10 Events]
+      summary: Gỡ hoạt động khỏi lịch
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': { description: UUID hoạt động đã gỡ }
         '409': { $ref: '#/components/responses/Error' }
   /api/v1/f10/events/{id}/qr-code:
     post:
@@ -575,6 +715,8 @@ paths:
       parameters:
         - { name: q, in: query, schema: { type: string } }
         - { name: category, in: query, schema: { type: string, enum: [EVENT, PROMOTION] } }
+        - { name: availability, in: query, schema: { type: string, enum: [CURRENT, UPCOMING] } }
+        - { name: type, in: query, schema: { type: string } }
         - { $ref: '#/components/parameters/page' }
         - { $ref: '#/components/parameters/size' }
       responses:
@@ -601,6 +743,7 @@ components:
     bearerAuth: { type: http, scheme: bearer, bearerFormat: JWT }
   parameters:
     id: { name: id, in: path, required: true, schema: { $ref: '#/components/schemas/UUID' } }
+    versionQuery: { name: version, in: query, required: true, schema: { type: integer, format: int64, minimum: 0 } }
     page: { name: page, in: query, schema: { type: integer, minimum: 0, default: 0 } }
     size: { name: size, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 20 } }
     q: { name: q, in: query, schema: { type: string, maxLength: 100 } }
@@ -904,6 +1047,8 @@ components:
         startAt: { type: string, format: date-time }
         endAt: { type: string, format: date-time }
         location: { type: string, nullable: true, description: Mô tả vị trí, không có mã nội bộ }
+        terms: { type: string, nullable: true }
+        availability: { type: string, enum: [CURRENT, UPCOMING] }
   responses:
     PremisePage:
       description: Trang mặt bằng

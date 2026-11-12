@@ -12,24 +12,31 @@ type Envelope<T> = {
 export const UUID_PATTERN = "[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}";
 export const localIdentityEnabled = process.env.NEXT_PUBLIC_ANEON_LOCAL_IDENTITY === "true";
 
-export async function request<T>(path: string, options: {
-  identity?: Identity;
-  method?: string;
-  body?: unknown;
-  signal?: AbortSignal;
-} = {}): Promise<T> {
-  const headers = new Headers({ Accept: "application/json" });
-  const { identity, method, body, signal } = options;
+function identityHeaders(identity?: Identity) {
+  const headers = new Headers();
   if (identity?.mode === "jwt") headers.set("Authorization", `Bearer ${identity.token}`);
   if (identity?.mode === "local") {
     headers.set("X-Actor-Id", identity.actorId);
     headers.set("X-Actor-Roles", identity.role);
     if (identity.zones) headers.set("X-Actor-Zones", identity.zones);
   }
-  if (body !== undefined) headers.set("Content-Type", "application/json");
+  return headers;
+}
+
+export async function request<T>(path: string, options: {
+  identity?: Identity;
+  method?: string;
+  body?: unknown;
+  signal?: AbortSignal;
+} = {}): Promise<T> {
+  const { identity, method, body, signal } = options;
+  const headers = identityHeaders(identity);
+  headers.set("Accept", "application/json");
+  const multipart = body instanceof FormData;
+  if (body !== undefined && !multipart) headers.set("Content-Type", "application/json");
   const response = await fetch(`/aneon-api/${path}`, {
     method, headers, signal, cache: "no-store",
-    body: body === undefined ? undefined : JSON.stringify(body),
+    body: multipart ? body : body === undefined ? undefined : JSON.stringify(body),
   });
   const envelope: Envelope<T> | null = await response.json().catch(() => null);
   if (!response.ok || envelope?.data === undefined) {
@@ -41,6 +48,17 @@ export async function request<T>(path: string, options: {
     throw new Error(message || fields || envelope?.message || "Không thể kết nối máy chủ ANEON. Vui lòng thử lại.");
   }
   return envelope.data;
+}
+
+export async function downloadAttachment(path: string, identity: Identity, name: string) {
+  const response = await fetch(`/aneon-api/${path}`, { headers: identityHeaders(identity), cache: "no-store" });
+  if (!response.ok) throw new Error("Không tải được tệp đính kèm.");
+  const url = URL.createObjectURL(await response.blob());
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = name;
+  link.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 export function query(params: Record<string, string | number | undefined>) {

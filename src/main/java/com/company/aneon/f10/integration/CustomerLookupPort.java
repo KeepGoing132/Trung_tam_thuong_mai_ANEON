@@ -1,5 +1,6 @@
 package com.company.aneon.f10.integration;
 
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -8,4 +9,6 @@ import java.util.UUID;
 public interface CustomerLookupPort {
 
     boolean customerExists(UUID customerId);
+
+    List<String> activeMembershipTiers(UUID customerId);
 }

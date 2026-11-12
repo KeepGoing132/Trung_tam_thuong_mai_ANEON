@@ -19,7 +19,6 @@ import com.company.aneon.f10.entity.ChuongTrinhTichDiem;
 import com.company.aneon.f10.entity.KhuyenMaiCuaHang;
 import com.company.aneon.f10.entity.LanApDungKhuyenMai;
 import com.company.aneon.f10.entity.PhieuUuDai;
-import com.company.aneon.f10.entity.PhieuUuDaiCuaHang;
 import com.company.aneon.f10.entity.PhieuUuDaiKhachHang;
 import com.company.aneon.f10.integration.CustomerLookupPort;
 import com.company.aneon.f10.integration.F01LookupPort;
@@ -225,6 +224,16 @@ public class PromotionServiceImpl implements PromotionService {
         if (!invoice.customerId().equals(request.customerId())) {
             throw ApiException.conflict("Hoa don khong thuoc khach hang nay");
         }
+        var eligibleStores = promotionStoreRepository.findByPromotionId(promotionId);
+        if (!eligibleStores.isEmpty() && eligibleStores.stream().noneMatch(link -> link.getStoreId().equals(invoice.storeId()))) {
+            throw ApiException.conflict("Cua hang tren hoa don khong tham gia chuong trinh");
+        }
+        var targetTiers = program.targetTiersAsList();
+        if (!targetTiers.isEmpty()
+                && customerLookupPort.activeMembershipTiers(request.customerId()).stream()
+                        .noneMatch(tier -> targetTiers.stream().anyMatch(tier::equalsIgnoreCase))) {
+            throw ApiException.conflict("Hang thanh vien khong du dieu kien ap dung chuong trinh");
+        }
         BigDecimal minimum = program.getMinimumInvoiceAmount();
         if (minimum != null && invoice.totalAmount().compareTo(minimum) < 0) {
             throw ApiException.conflict("Hoa don khong du gia tri toi thieu "
@@ -259,6 +268,15 @@ public class PromotionServiceImpl implements PromotionService {
                     throw ApiException.conflict("Voucher khong dung chu hoac da su dung");
                 }
                 PhieuUuDai voucher = instance.getVoucher();
+                var template = ((ChuongTrinhTangPhieuUuDai) program).getVoucher();
+                if (template == null || !template.getId().equals(voucher.getId())) {
+                    throw ApiException.conflict("Voucher khong thuoc chuong trinh nay");
+                }
+                if (!voucher.isActive() || voucher.getArchivedAt() != null
+                        || voucher.getValidFrom() != null && now.isBefore(voucher.getValidFrom())
+                        || voucher.getExpiresAt() != null && now.isAfter(voucher.getExpiresAt())) {
+                    throw ApiException.conflict("Voucher khong con hieu luc");
+                }
                 discountAmount = voucherDiscount(voucher, invoice.totalAmount());
                 instance.setStatus(VoucherIssueStatus.USED);
                 instance.setRedeemedAt(now);

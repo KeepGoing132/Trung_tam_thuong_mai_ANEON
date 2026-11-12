@@ -19,6 +19,8 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.multipart.support.MissingServletRequestPartException;
 
 import jakarta.servlet.http.HttpServletRequest;
 
@@ -59,9 +61,15 @@ public class GlobalExceptionHandler {
     }
 
     @ExceptionHandler({HttpMessageNotReadableException.class, MethodArgumentTypeMismatchException.class,
-            jakarta.validation.ConstraintViolationException.class})
+            jakarta.validation.ConstraintViolationException.class, MissingServletRequestPartException.class})
     public ResponseEntity<ApiErrorBody> handleUnreadable(Exception ex) {
         return build(ErrorCode.VALIDATION_ERROR, "Du lieu khong doc duoc hoac sai dinh dang", List.of());
+    }
+
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    public ResponseEntity<ApiErrorBody> handleUploadSize(MaxUploadSizeExceededException ex) {
+        return ResponseEntity.status(413).body(new ApiErrorBody(413, "Tep vuot gioi han dung luong",
+                "UPLOAD_TOO_LARGE", null, MDC.get("traceId")));
     }
 
     @ExceptionHandler(AccessDeniedException.class)

@@ -27,9 +27,11 @@ public class PublicSearchController {
     public ApiResponse<PublicDtos.PublicSearchResponse> search(
             @RequestParam(required = false) String q,
             @RequestParam(required = false) String category,
+            @RequestParam(required = false) String availability,
+            @RequestParam(required = false) String type,
             @RequestParam(required = false) Integer page,
             @RequestParam(required = false) Integer size) {
         return ApiResponse.ok("Tim kiem thanh cong", publicSearchService
-                .search(q, category, PageParams.page(page), PageParams.size(size)));
+                .search(q, category, availability, type, PageParams.page(page), PageParams.size(size)));
     }
 }

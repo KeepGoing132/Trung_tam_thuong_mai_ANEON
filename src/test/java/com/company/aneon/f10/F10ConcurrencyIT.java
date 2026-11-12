@@ -39,6 +39,7 @@ import com.company.aneon.f10.repository.MaQrThamGiaRepository;
 import com.company.aneon.f10.repository.PhieuUuDaiRepository;
 import com.company.aneon.f10.repository.SuKienRepository;
 import com.company.aneon.f10.service.EventService;
+import com.company.aneon.f10.service.EventFiles;
 import com.company.aneon.f10.service.PromotionService;
 import com.company.aneon.f10.service.QrCodeService;
 import com.company.aneon.f10.service.VoucherService;
@@ -52,6 +53,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.http.MediaType;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
@@ -86,6 +88,7 @@ class F10ConcurrencyIT extends AbstractMySqlIntegrationTest {
     @Autowired PromotionService promotionService;
     @Autowired QrCodeService qrCodeService;
     @Autowired EventService eventService;
+    @Autowired EventFiles eventFiles;
     @Autowired CuaHangSapService cuaHangSapService;
     @Autowired MatBangService matBangService;
     @Autowired JdbcTemplate jdbc;
@@ -393,6 +396,38 @@ class F10ConcurrencyIT extends AbstractMySqlIntegrationTest {
         var realtime = promotionService.realtime(promotion.id());
         assertThat(realtime.usedCount()).isEqualTo(1);
         assertThat(realtime.totalDiscountGranted()).isEqualByComparingTo("50000");
+    }
+
+    @Test
+    void luuSuaGuiBanNhapVaCapNhatLichHoatDong() throws Exception {
+        login(actorId, "MARKETING");
+        String code = "DRAFT-" + UUID.randomUUID();
+        Instant start = Instant.now().plus(1, ChronoUnit.DAYS);
+        Instant end = start.plus(2, ChronoUnit.HOURS);
+        var draft = eventService.createDraft(new EventDtos.CreateEventProposalRequest(code, "Ban nhap", null,
+                chain.locationId(), start, end, BigDecimal.TEN, 10, false, List.of(), List.of()));
+        assertThat(draft.status()).isEqualTo(EventStatus.DRAFT);
+        byte[] pdf = "%PDF-1.4\n% ANEON test\n%%EOF".getBytes(java.nio.charset.StandardCharsets.US_ASCII);
+        var attachment = eventFiles.upload(draft.id(), new MockMultipartFile("file", "Ke hoach.pdf", "application/pdf", pdf));
+        assertThat(eventFiles.list(draft.id())).containsExactly(attachment);
+        assertThat(eventFiles.download(draft.id(), attachment.id()).bytes()).containsExactly(pdf);
+        assertThatThrownBy(() -> eventFiles.upload(draft.id(), new MockMultipartFile("file", "gia.pdf", "application/pdf", new byte[] { 1 })))
+                .isInstanceOf(ApiException.class);
+        var edited = eventService.updateDraft(draft.id(), eventService.detail(draft.id()).version(),
+                new EventDtos.CreateEventProposalRequest(code, "Ban nhap da sua", null,
+                        chain.locationId(), start, end, BigDecimal.TEN, 10, false, List.of(), List.of()));
+        assertThat(edited.name()).isEqualTo("Ban nhap da sua");
+        assertThat(eventService.submitDraft(draft.id(), edited.version()).status()).isEqualTo(EventStatus.PENDING_APPROVAL);
+        assertThat(eventFiles.list(draft.id())).containsExactly(attachment);
+
+        var activity = new EventDtos.CreateActivityRequest("Tiet muc", start, start.plusSeconds(1800), chain.locationId(), null, null);
+        eventService.addActivities(draft.id(), new EventDtos.CreateActivitiesRequest(List.of(activity)));
+        var item = eventService.activities(draft.id()).getFirst();
+        var updated = eventService.updateActivity(draft.id(), item.id(), item.version(),
+                new EventDtos.CreateActivityRequest("Tiet muc da sua", start, start.plusSeconds(1800), chain.locationId(), null, null));
+        assertThat(updated.name()).isEqualTo("Tiet muc da sua");
+        eventService.archiveActivity(draft.id(), item.id(), updated.version());
+        assertThat(eventService.activities(draft.id())).isEmpty();
     }
 
     private SuKien approvedEventNow() {

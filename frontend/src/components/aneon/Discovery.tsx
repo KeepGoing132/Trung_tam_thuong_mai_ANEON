@@ -6,14 +6,14 @@ import { formatDate, query, request, type Page } from "@/lib/aneon-api";
 import { ErrorMessage, Field, input, Pagination, primary, secondary } from "./Ui";
 
 export type Category = "EVENT" | "PROMOTION";
-type PublicItem = { id: string; title: string; category: Category; type?: string; startAt?: string; endAt?: string; location?: string };
+type PublicItem = { id: string; title: string; category: Category; type?: string; startAt?: string; endAt?: string; location?: string; terms?: string; availability: "CURRENT" | "UPCOMING" };
 const categories = { EVENT: "Sự kiện", PROMOTION: "Ưu đãi" };
 const promotionTypes: Record<string, string> = {
   DISCOUNT: "Giảm giá", VOUCHER_GIVEAWAY: "Tặng voucher", POINT_ACCUMULATION: "Tích điểm",
 };
 
 export function Discovery({ initialCategory = "", preview = false }: { initialCategory?: Category | ""; preview?: boolean }) {
-  const [filters, setFilters] = useState({ q: "", category: initialCategory, page: 0 });
+  const [filters, setFilters] = useState({ q: "", category: initialCategory, availability: "", type: "", page: 0 });
   const [data, setData] = useState<Page<PublicItem>>();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -34,14 +34,21 @@ export function Discovery({ initialCategory = "", preview = false }: { initialCa
   return (
     <div className="grid gap-5" aria-busy={loading}>
       {!preview && (
-        <form className="grid gap-3 rounded-2xl border border-cream-line bg-white p-4 sm:grid-cols-[1fr_12rem_auto] sm:items-end" onSubmit={(event) => {
+        <form className="grid gap-3 rounded-2xl border border-cream-line bg-white p-4 sm:grid-cols-2 lg:grid-cols-[1fr_10rem_11rem_11rem_auto] lg:items-end" onSubmit={(event) => {
           event.preventDefault();
           const values = new FormData(event.currentTarget);
-          setFilters({ q: String(values.get("q")).trim(), category: values.get("category") as Category | "", page: 0 });
+          setFilters({ q: String(values.get("q")).trim(), category: values.get("category") as Category | "",
+            availability: String(values.get("availability")), type: String(values.get("type")), page: 0 });
         }}>
-          <Field label="Từ khóa"><input name="q" type="search" maxLength={200} placeholder="Tên sự kiện hoặc ưu đãi" className={input} /></Field>
+          <Field label="Từ khóa"><input name="q" type="search" maxLength={200} placeholder="Tên, loại hoặc gian hàng" className={input} /></Field>
           <Field label="Danh mục"><select name="category" defaultValue={initialCategory} className={input}>
             <option value="">Tất cả</option><option value="EVENT">Sự kiện</option><option value="PROMOTION">Ưu đãi</option>
+          </select></Field>
+          <Field label="Thời gian"><select name="availability" className={input}>
+            <option value="">Tất cả</option><option value="CURRENT">Đang diễn ra</option><option value="UPCOMING">Sắp diễn ra</option>
+          </select></Field>
+          <Field label="Hình thức ưu đãi"><select name="type" className={input}>
+            <option value="">Tất cả</option>{Object.entries(promotionTypes).map(([type, label]) => <option key={type} value={type}>{label}</option>)}
           </select></Field>
           <button className={primary} type="submit">Tìm kiếm</button>
         </form>
@@ -58,11 +65,16 @@ export function Discovery({ initialCategory = "", preview = false }: { initialCa
                 <span className="inline-flex rounded-full bg-magenta-deep/8 px-3 py-1 text-xs font-semibold text-magenta-deep">{categories[item.category]}</span>
                 <h3 className="mt-4 font-display text-2xl leading-tight text-plum wrap-break-word">{item.title}</h3>
                 {item.type && <p className="mt-2 text-sm text-ink-soft">{promotionTypes[item.type] ?? item.type}</p>}
+                {item.availability && <p className="mt-2 text-sm font-semibold text-magenta-deep">{item.availability === "UPCOMING" ? "Sắp diễn ra" : "Đang diễn ra"}</p>}
                 <dl className="mt-5 grid grid-cols-[auto_1fr] gap-x-3 gap-y-2 border-t border-cream-line pt-4 text-sm">
                   <dt className="text-ink-soft">Bắt đầu</dt><dd>{formatDate(item.startAt)}</dd>
                   <dt className="text-ink-soft">Kết thúc</dt><dd>{formatDate(item.endAt)}</dd>
                   {item.location && <><dt className="text-ink-soft">Địa điểm</dt><dd className="wrap-break-word">{item.location}</dd></>}
                 </dl>
+                {item.terms && !preview && <details className="mt-4 border-t border-cream-line pt-4 text-sm">
+                  <summary className="cursor-pointer font-semibold text-plum">Điều kiện áp dụng</summary>
+                  <p className="mt-2 whitespace-pre-wrap wrap-break-word">{item.terms}</p>
+                </details>}
               </li>
             ))}
           </ul>

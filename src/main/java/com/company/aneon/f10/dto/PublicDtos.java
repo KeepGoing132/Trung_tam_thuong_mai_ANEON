@@ -15,11 +15,11 @@ public final class PublicDtos {
 
     /** Hang gop tu truy van UNION trong PublicSearchQueryDao. */
     public record PublicRow(UUID id, String title, String category, String type,
-                            Instant startAt, Instant endAt, String location) {
+                            Instant startAt, Instant endAt, String location, String terms) {
     }
 
     public record PublicItem(UUID id, String title, String category, String type,
-                             Instant startAt, Instant endAt, String location) {
+                             Instant startAt, Instant endAt, String location, String terms, String availability) {
     }
 
     public record PublicSearchResponse(List<PublicItem> content, int page, int size, long totalElements) {
