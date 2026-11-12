@@ -73,6 +73,7 @@ export default function Header() {
         </nav>
 
         <div className="flex items-center gap-3">
+          <a href="/tai-khoan" className={`hidden text-[13px] font-semibold lg:inline-flex ${scrolled ? "text-magenta-deep" : "text-cream"}`}>Tài khoản</a>
           <a href="/quan-ly" className={`hidden text-[13px] font-semibold lg:inline-flex ${scrolled ? "text-magenta-deep" : "text-cream"}`}>
             Quản lý
           </a>
@@ -135,6 +136,7 @@ export default function Header() {
                 {item.label}
               </motion.a>
             ))}
+            <a href="/tai-khoan" onClick={() => setOpen(false)} className="border-b border-cream/10 py-5 font-display text-3xl text-cream">Tài khoản</a>
             <a href="/quan-ly" onClick={() => setOpen(false)} className="border-b border-cream/10 py-5 font-display text-3xl text-cream">Quản lý</a>
             <a
               href="#gian-hang"

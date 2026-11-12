@@ -3,7 +3,7 @@
 aneon:
   security:
     jwt-enabled: false
-    local-identity-enabled: true
+    local-identity-enabled: ${ANEON_LOCAL_IDENTITY:false}
 
 logging:
   level:

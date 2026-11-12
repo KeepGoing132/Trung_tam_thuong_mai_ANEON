@@ -1,7 +1,7 @@
 package com.company.aneon.shared.security;
 
-import java.util.List;
-
+import com.company.aneon.shared.auth.AuthService;
+import com.company.aneon.shared.auth.SessionAuthenticationFilter;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -11,7 +11,6 @@ import org.springframework.security.config.annotation.web.configuration.EnableWe
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.oauth2.jwt.JwtDecoders;
 import org.springframework.security.web.SecurityFilterChain;
-import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.security.web.context.SecurityContextHolderFilter;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
 import org.springframework.security.oauth2.server.resource.authentication.JwtGrantedAuthoritiesConverter;
@@ -31,13 +30,16 @@ public class SecurityConfig {
     private final boolean jwtEnabled;
     private final String jwtIssuer;
     private final boolean localIdentityEnabled;
+    private final AuthService authService;
 
     public SecurityConfig(@Value("${aneon.security.jwt-enabled:false}") boolean jwtEnabled,
                           @Value("${aneon.security.jwt-issuer:}") String jwtIssuer,
-                          @Value("${aneon.security.local-identity-enabled:false}") boolean localIdentityEnabled) {
+                          @Value("${aneon.security.local-identity-enabled:false}") boolean localIdentityEnabled,
+                          AuthService authService) {
         this.jwtEnabled = jwtEnabled;
         this.jwtIssuer = jwtIssuer;
         this.localIdentityEnabled = localIdentityEnabled;
+        this.authService = authService;
     }
 
     @Bean
@@ -61,6 +63,8 @@ public class SecurityConfig {
                         }))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/f10/promotions-events/search").permitAll()
+                        .requestMatchers(org.springframework.http.HttpMethod.POST, "/api/v1/auth/login", "/api/v1/auth/register",
+                                "/api/v1/auth/logout", "/api/v1/auth/recover").permitAll()
                         .requestMatchers("/actuator/health", "/actuator/info").permitAll()
                         .requestMatchers("/api/**").authenticated()
                         .anyRequest().permitAll());
@@ -84,7 +88,8 @@ public class SecurityConfig {
                             .jwtAuthenticationConverter(converter)));
         }
         http.addFilterBefore(new TraceIdFilter(), SecurityContextHolderFilter.class);
-        http.addFilterAfter(new LocalIdentityFilter(localIdentityEnabled), SecurityContextHolderFilter.class);
+        http.addFilterAfter(new SessionAuthenticationFilter(authService), SecurityContextHolderFilter.class);
+        http.addFilterAfter(new LocalIdentityFilter(localIdentityEnabled), SessionAuthenticationFilter.class);
         return http.build();
     }
 }

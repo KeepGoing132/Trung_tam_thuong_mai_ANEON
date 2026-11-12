@@ -48,7 +48,7 @@ public class PromotionController {
     }
 
     @PostMapping("/{id}/applications")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasAnyRole('MARKETING','OPERATIONS')")
     public ResponseEntity<ApiResponse<PromotionDtos.ApplyPromotionResult>> apply(
             @PathVariable UUID id,
             @Valid @RequestBody PromotionDtos.ApplyPromotionRequest request) {

@@ -20,7 +20,7 @@ src/main/java/com/company/aneon/
   shared/            # envelope ApiResponse, lỗi chuẩn, security/scope, entity audit, reference
   f01/               # Quản lý mặt bằng: 8 entity, 5 service, 5 controller, 18 UC
   f10/               # Sự kiện & khuyến mãi: 15 bảng, 6 service, controller, 9 UC + bổ sung
-src/main/resources/db/migration/   # V1 baseline, V2 ràng buộc, V3 bảng tham chiếu, V4 nội dung tệp
+src/main/resources/db/migration/   # V1–V4 dữ liệu nghiệp vụ và V5 phiên đăng nhập
 src/test/java/com/company/aneon/   # unit test + IT (Testcontainers hoặc MySQL ngoài)
 docs/decisions/      # Quyết định thiết kế (D0001–D0010)
 docs/openapi/        # Hợp đồng OpenAPI F01/F10
@@ -45,8 +45,11 @@ GRANT ALL PRIVILEGES ON qldapm_aneon.* TO 'aneon'@'localhost';
 #   ANEON_DB_USERNAME=aneon   ANEON_DB_PASSWORD=aneon
 ```
 
-3. Profile `local` bật danh tính stub qua header (chưa có identity provider — xem
-   `docs/decisions/0008`):
+3. Tạo quản trị đầu tiên bằng `ANEON_BOOTSTRAP_ADMIN_USERNAME` và `ANEON_BOOTSTRAP_ADMIN_PASSWORD`
+   trước khi chạy backend. Đăng nhập tại `/quan-ly`, đổi mật khẩu tạm rồi tạo tài khoản nhân viên.
+   Khách tự đăng ký tại `/tai-khoan`. Xem [luồng tài khoản và triển khai HTTPS](docs/auth-flow.md).
+
+   Để thử API bằng UUID trong môi trường phát triển, đặt `ANEON_LOCAL_IDENTITY=true`:
 
 ```
 X-Actor-Id: <UUID tai khoan ton tai trong tai_khoan_nguoi_dung>
@@ -100,7 +103,7 @@ các lần chạy — các mã dùng trong IT sinh duy nhất theo thời gian n
 
 ## Chưa triển khai (ngoài phạm vi giao)
 
-- Nhà cung cấp danh tính và ma trận quyền F16 chính thức, ứng dụng quản lý độc lập của
+- Xác minh email và khôi phục qua email, nhà cung cấp định danh ngoài và ma trận quyền F16 chính thức, ứng dụng quản lý độc lập của
   F02/F03/F11/F18, thông báo F15, doanh thu quy thuộc để tính ROI và Redis/cache.
 - F01 đọc hợp đồng, khách thuê và sơ đồ đã phát hành từ MySQL. F10 đối chiếu hóa đơn,
   gian hàng, hạng thành viên và lưu nội dung tệp đề xuất trong MySQL.
@@ -114,9 +117,10 @@ các lần chạy — các mã dùng trong IT sinh duy nhất theo thời gian n
 | `/` | Trang giới thiệu, gian hàng mẫu có bộ lọc, sự kiện và ưu đãi lấy từ F10 |
 | `/kham-pha` | Khách tra cứu sự kiện và ưu đãi theo tên, danh mục và trang |
 | `/check-in` | Khách xác nhận tham gia từ liên kết có `event` và `token` do F10 tạo |
+| `/tai-khoan` | Đăng ký khách, đăng nhập, đổi mật khẩu và quản lý mã khôi phục |
 | `/quan-ly` | Nhân viên quản lý mặt bằng, cửa hàng, trạng thái, lịch sử, khai thác (F01), sự kiện, khuyến mãi và voucher (F10) |
 
-Chạy Spring Boot theo phần trên. Để thử nghiệp vụ bằng danh tính local, mở PowerShell ở thư mục `code`:
+Chạy Spring Boot theo phần trên. Để chạy nghiệp vụ trên máy, mở PowerShell ở thư mục `code`:
 
 ```powershell
 $env:ANEON_PUBLIC_CHECKIN_BASE_URL = 'http://localhost:3000/check-in'
@@ -128,18 +132,18 @@ Trong cửa sổ PowerShell khác:
 ```powershell
 cd frontend
 npm install
-$env:NEXT_PUBLIC_ANEON_LOCAL_IDENTITY = 'true' # chỉ dùng khi backend chạy profile local
 npm run dev      # http://localhost:3000
 ```
 
 - Next.js chuyển tiếp `/aneon-api/*` tới Spring Boot ở `http://127.0.0.1:8080/api/v1/*`.
   Đặt `ANEON_API_ORIGIN` trước khi chạy Next.js nếu backend dùng địa chỉ khác.
-- Ở `/quan-ly`, nhập UUID trong `tai_khoan_nguoi_dung` và chọn vai trò local. Tạo hoặc sửa
+- Ở `/quan-ly`, đăng nhập bằng tài khoản do quản trị cấp. Tạo hoặc sửa
   bản ghi cần tài khoản và các UUID tham chiếu đã có trong MySQL. Ví dụ: tạo mặt bằng cần
   `khu_vuc.id`, đề xuất sự kiện cần `vi_tri.id`, và check-in của khách cần tài khoản có
   `customer_id` trỏ tới `khach_mua_sam.id`.
-- Khi đã có JWT từ hệ thống định danh, giao diện gửi `Authorization: Bearer …`. Tắt
-  chế độ local ở cả hai ứng dụng khi triển khai; dự án hiện chưa tích hợp nhà cung cấp định danh.
+- Để mở chế độ UUID thử nghiệm, bật `ANEON_LOCAL_IDENTITY=true` ở backend và
+  `NEXT_PUBLIC_ANEON_LOCAL_IDENTITY=true` khi dựng frontend. Khi triển khai HTTPS, tắt chế độ thử nghiệm
+  và bật `ANEON_AUTH_SECURE_COOKIES=true`. JWT bên ngoài dùng `ANEON_JWT_ENABLED` và `ANEON_JWT_ISSUER`.
 - Dùng `npm run build` và `npm start` để chạy bản production.
 - Nạp dữ liệu demo sau khi Flyway chạy xong bằng lệnh `SOURCE E:/duong-dan-den-code/scripts/seed-local.sql;`
   trong MySQL client đã chọn database demo. Script bổ sung bản ghi mẫu còn thiếu và giữ bản ghi đã tồn tại.

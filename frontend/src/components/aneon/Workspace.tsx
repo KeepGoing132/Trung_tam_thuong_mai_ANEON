@@ -1,18 +1,23 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
 import { useState } from "react";
-import { formatDate, type Identity } from "@/lib/aneon-api";
+import { formatDate } from "@/lib/aneon-api";
+import { AccountSecurity } from "./AccountSecurity";
 import { EventsWorkspace } from "./EventsWorkspace";
 import { IdentityForm, staffRoles } from "./IdentityForm";
 import { PremisesWorkspace, type PremisesView } from "./PremisesWorkspace";
 import { PromotionsWorkspace } from "./PromotionsWorkspace";
-import { panel, secondary } from "./Ui";
+import { ErrorMessage, panel, secondary } from "./Ui";
 import { allowed, MutationForm } from "./WorkspaceUi";
+import { StaffAccounts } from "./StaffAccounts";
+import { useAneonIdentity } from "./useAneonIdentity";
 
-type View = PremisesView | "events" | "promotions" | "vouchers" | "assist";
+type View = PremisesView | "events" | "promotions" | "vouchers" | "assist" | "staff";
 const staffReaders = ["MANAGEMENT", "OPERATIONS", "DIRECTOR", "ACCOUNTING", "SYSTEM_ADMIN"];
-const views: { id: View; label: string; group: "F01" | "F10"; roles: string[] }[] = [
+const views: { id: View; label: string; group: "F01" | "F10" | "F16"; roles: string[] }[] = [
+  { id: "staff", label: "Tài khoản nhân viên", group: "F16", roles: ["SYSTEM_ADMIN"] },
   { id: "premises", label: "Mặt bằng", group: "F01", roles: staffReaders },
   { id: "stores", label: "Cửa hàng / sạp", group: "F01", roles: staffReaders },
   { id: "utilization", label: "Tình hình khai thác", group: "F01", roles: ["MANAGEMENT", "OPERATIONS", "DIRECTOR"] },
@@ -22,12 +27,12 @@ const views: { id: View; label: string; group: "F01" | "F10"; roles: string[] }[
   { id: "vouchers", label: "Voucher", group: "F10", roles: ["MANAGEMENT", "OPERATIONS", "MARKETING"] },
   { id: "assist", label: "Hỗ trợ check-in", group: "F10", roles: ["OPERATIONS", "MARKETING"] },
 ];
-const groups = { F01: "Quản lý mặt bằng", F10: "Sự kiện & khuyến mãi" } as const;
+const groups = { F16: "Phân quyền", F01: "Quản lý mặt bằng", F10: "Sự kiện & khuyến mãi" } as const;
 const atriumPhoto = "/aneon/mall-atrium.webp";
 const eventPhoto = "/aneon/mall-event.webp";
 
 export function Workspace() {
-  const [identity, setIdentity] = useState<Identity>();
+  const { identity, setIdentity, loading, error, signingOut, signOut } = useAneonIdentity();
   const [view, setView] = useState<View>();
 
   if (!identity) return (
@@ -42,21 +47,32 @@ export function Workspace() {
         <div className="mx-auto w-full max-w-md">
           <h2 id="identity-heading" className="mb-2 font-display text-2xl text-plum sm:text-3xl">Kết nối tài khoản nhân viên</h2>
           <p className="mb-6 text-sm leading-relaxed text-ink-soft">Dùng tài khoản được cấp quyền cho nghiệp vụ bạn phụ trách.</p>
-          <IdentityForm onConnect={(next) => { setView(undefined); setIdentity(next); }} />
+          {error && <div className="mb-4"><ErrorMessage message={error} /></div>}
+          {loading ? <p role="status" className="text-sm">Đang kiểm tra phiên đăng nhập…</p>
+            : <IdentityForm onConnect={(next) => { setView(undefined); setIdentity(next); }} />}
         </div>
       </section>
     </div>
   );
 
-  const available = views.filter(({ roles }) => allowed(identity, ...roles));
+  if (identity.mode === "session" && identity.mustChangePassword) return <div className="mx-auto grid max-w-2xl gap-4">
+    <h1 className="font-display text-4xl text-plum">Quản lý ANEON</h1>
+    {error && <ErrorMessage message={error} />}
+    <AccountSecurity identity={identity} onChanged={setIdentity} />
+    <button className={`${secondary} justify-self-start`} type="button" disabled={signingOut} onClick={() => void signOut()}>Đăng xuất</button>
+  </div>;
+
+  const available = views.filter(({ id, roles }) => allowed(identity, ...roles) && (id !== "staff" || identity.mode === "session"));
   const current = available.find(({ id }) => id === view) ?? available[0];
-  const role = identity.mode === "local" ? staffRoles[identity.role as keyof typeof staffRoles] : undefined;
+  const role = identity.mode === "jwt" ? undefined : staffRoles[identity.role as keyof typeof staffRoles];
 
   return <div className="grid items-start gap-5 lg:grid-cols-[15rem_minmax(0,1fr)]">
     <aside className={panel}>
       <div className="mb-5 border-b border-cream-line pb-4">
-        <p className="text-sm font-semibold text-plum">{role ? `${role} · Local` : "Phiên dùng token"}</p>
-        <button className="mt-2 text-sm font-semibold text-magenta-deep underline underline-offset-4" onClick={() => setIdentity(undefined)}>Kết thúc phiên</button>
+        <p className="text-sm font-semibold text-plum">{identity.mode === "session" ? identity.fullName || identity.username : role ? `${role} · Local` : "Phiên dùng token"}</p>
+        {identity.mode === "session" && <Link href="/tai-khoan" className="mt-2 block text-sm font-semibold text-magenta-deep underline underline-offset-4">Bảo mật tài khoản</Link>}
+        <button type="button" disabled={signingOut} className="mt-2 text-sm font-semibold text-magenta-deep underline underline-offset-4" onClick={() => void signOut()}>Đăng xuất</button>
+        {error && <div className="mt-3"><ErrorMessage message={error} /></div>}
       </div>
       <nav aria-label="Nghiệp vụ" className="grid gap-5 sm:grid-cols-2 lg:grid-cols-1">
         {(Object.keys(groups) as (keyof typeof groups)[]).map((group) => {
@@ -84,6 +100,7 @@ export function Workspace() {
         </div>
       </header>
       {!current && <p className={panel}>Vai trò này chưa có quyền trên màn hình quản lý.</p>}
+      {current?.id === "staff" && identity.mode === "session" && <StaffAccounts identity={identity} />}
       {current?.group === "F01" && <PremisesWorkspace identity={identity} view={current.id as PremisesView} key={current.id} />}
       {current?.id === "events" && <EventsWorkspace identity={identity} />}
       {(current?.id === "promotions" || current?.id === "vouchers") && <PromotionsWorkspace identity={identity} view={current.id} key={current.id} />}
